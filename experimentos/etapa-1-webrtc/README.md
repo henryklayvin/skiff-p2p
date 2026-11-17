@@ -13,7 +13,7 @@
 | P2 | Conexão WebRTC por troca manual de SDP | Concluído: duas abas e PC ↔ iPhone conectados; PC ↔ emulador falhou (ver `resultados.md`) |
 | P3 | Latência do canal `controle` com o canal ocioso | Concluído: mediana de cerca de 5 ms entre PC e iPhone (ver `resultados.md`) |
 | P4 | Envio em blocos de 16 KiB com controle de fluxo local; destino em Blob | Concluído: 100 MiB íntegros com remetente estável (máximo de 2,7 MiB); 50 MiB PC → iPhone a 28 MiB/s |
-| P5 | Confirmações (ACK) e janela ponta a ponta de 8 MiB | Implementado e testado automaticamente; validação manual pendente |
+| P5 | Confirmações (ACK) e janela ponta a ponta de 8 MiB | Concluído: janela limitada a 8 MiB com o iPhone lento; 50 MiB PC → iPhone a 29–32 MiB/s |
 | P6 a P11 | Hash, cancelamento, destinos, coturn, testes e relatório | Pendentes |
 
 ## Arquivos deste diretório

@@ -127,6 +127,22 @@ Nos testes, o SHA-256 é calculado sobre o arquivo inteiro já recebido, só par
 - **Hipótese:** perda de pacotes UDP no início da associação SCTP quando os dois lados estão na mesma máquina, com recuperação lenta por retransmissões. A confirmar em rede real nos testes manuais.
 - **Consequência para os testes automáticos:** a vazão da primeira transferência na mesma máquina não é representativa. Medições de vazão devem considerar uma transferência de aquecimento.
 
+**Testes manuais: PC-1 (Chrome 157) → IOS-1 (Safari, iOS 26.6.2), Wi-Fi, conexão direta e nova.**
+
+| Teste | Duração | Vazão | Maior janela | Pausas (buffer / janela) | Confirmações | Memória do PC-1 (aba) |
+|---|---|---|---|---|---|---|
+| 1º envio de 50 MiB da conexão | 1,72 s | 29,1 MiB/s | 6,5 MiB | 59 / 0 | 50 | 1,8 / 2,1 / 0,8 MiB |
+| 2º envio de 50 MiB, com medição de latência simultânea | 1,54 s | 32,5 MiB/s | 2,5 MiB | 60 / 0 | 50 | 1,8 / 1,9 / 0,9 MiB |
+| 50 MiB com o iPhone lento (100 ms por MiB) | 5,88 s | 8,5 MiB/s | **8,0 MiB** | 25 / **31** | 50 | 3,1 / 3,1 / 0,9 MiB |
+
+Latência do `controle` medida no PC-1 **durante** o 2º envio (20 sondas): 20 de 20 respondidas; mínimo de 3,2 ms, **mediana de 17,4 ms, p95 de 103,3 ms** e máximo de 103,9 ms. Com o canal ocioso, a mediana era de 5,0 ms (P3).
+
+**Constatações:**
+1. **A primeira transferência pelo Wi-Fi não travou:** 1,72 s, contra 1,54 s no segundo envio. Isso reforça a hipótese de que o travamento é um efeito de os dois lados estarem na mesma máquina, e não do protocolo.
+2. **A janela funciona no iPhone real:** com o destinatário lento, ela limitou o envio (31 pausas) e parou em exatamente 8 MiB.
+3. **Latência sob carga:** a mediana sobe de cerca de 5 ms para cerca de 17 ms e o p95 chega a cerca de 100 ms. Um cancelamento ou uma confirmação podem levar até cerca de 100 ms para atravessar o `controle` durante a transferência, valor aceitável para a interface. O tempo real do cancelamento é medido no P7.
+4. No Safari, a memória da aba não pode ser medida (API indisponível), como previsto.
+
 ### Pendências
 
 - Confirmar a causa do item 4, desativando temporariamente a ocultação do IP local no Chrome do PC-1 (teste opcional) ou validando a conexão via TURN no P10.
