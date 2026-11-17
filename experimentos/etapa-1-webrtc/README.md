@@ -10,7 +10,7 @@
 |---|---|---|
 | P0 | Preparação: arquivos de teste, CA local, certificados, registros | Concluído |
 | P1 | Servidor HTTPS estático e página de diagnóstico | Concluído: PC, iPhone e emulador Android abrem sem alerta |
-| P2 | Conexão WebRTC por troca manual de SDP | Em andamento |
+| P2 | Conexão WebRTC por troca manual de SDP | Implementado e testado automaticamente; validação manual pendente |
 | P3 a P11 | Transferência, coturn, testes e relatório | Pendentes |
 
 ## Arquivos deste diretório
@@ -22,7 +22,14 @@
 | `registro-de-dispositivos.md` | Dispositivos usados nos testes (preencher antes da Fase D) |
 | `servidor.mjs` | Servidor HTTPS estático (módulo nativo `node:https`, sem dependências) |
 | `servidor.test.mjs` | Testes do servidor (`node:test`) |
-| `publico/` | **Único diretório servido**: página de diagnóstico e, nos próximos passos, o protótipo |
+| `autoteste-navegador.test.mjs` | Testes que executam as páginas num Chrome real, em modo headless |
+| `ferramentas/navegador.mjs` | Controle do Chrome headless pelo DevTools Protocol, sem dependências |
+| `publico/` | **Único diretório servido** |
+| `publico/index.html` | Diagnóstico do navegador |
+| `publico/prototipo.html` | Protótipo de conexão manual: papéis A/B, troca de SDP, estado, par selecionado, mensagem de teste |
+| `publico/autoteste.html` | Autoteste: lados A e B na mesma página, usado pelos testes automáticos |
+| `publico/js/conexao.js` | Criação da conexão, canais `controle` e `dados`, oferta e resposta com coleta completa de candidatos |
+| `publico/js/estatisticas.js` | Par de candidatos selecionado (`getStats`) e classificação direta/retransmitida |
 
 ## Executar o servidor
 
@@ -52,6 +59,18 @@ node --test "experimentos/etapa-1-webrtc/**/*.test.mjs"
 ```
 
 Os testes de integração usam os certificados do P0 e são ignorados se eles não existirem.
+
+Os testes no navegador abrem o Chrome instalado (ou o indicado em `SKIFF_CHROME`) em modo headless, com perfil temporário apagado ao final. Eles exigem a CA local confiável no Windows e acesso ao STUN do Google.
+
+## Como usar o protótipo de conexão (P2)
+
+1. Com o servidor rodando, abra `https://192.168.1.2:8443/prototipo.html` nos dois aparelhos, ou em duas abas.
+2. Num deles, escolha **"Sou A"** e clique em **Gerar oferta**. Copie a oferta.
+3. No outro, escolha **"Sou B"**, cole a oferta e clique em **Gerar resposta**. Copie a resposta.
+4. Em A, cole a resposta e clique em **Aplicar resposta**.
+5. Os dois lados devem mostrar a conexão `connected`, os canais `open` e o par de candidatos selecionado.
+
+Os textos de SDP contêm endereços IP. Troque-os só por canal privado e não os salve.
 
 **Verificação manual da cadeia** com o `curl` do Git para Windows:
 - é preciso usar `--ssl-no-revoke`, porque o Schannel tenta consultar a revogação do certificado e uma CA local não oferece esse serviço;

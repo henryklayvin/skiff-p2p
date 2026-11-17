@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skiff P2P — Protótipo de conexão</title>
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Skiff P2P — Protótipo de conexão</h1>
+      <p class="aviso">Protótipo descartável. Os textos de SDP contêm endereços IP: troque-os só por canal privado e não os salve.</p>
+      <p><a href="index.html">Diagnóstico do navegador</a></p>
+    </header>
+
+    <section aria-labelledby="titulo-configuracao">
+      <h2 id="titulo-configuracao">1. Configuração ICE</h2>
+      <label for="configuracao-ice">RTCConfiguration (JSON)</label>
+      <textarea id="configuracao-ice" rows="4" spellcheck="false"></textarea>
+      <p class="dica">Altere antes de escolher o papel. Depois de criada, a conexão usa esta configuração até a página ser recarregada.</p>
+    </section>
+
+    <section aria-labelledby="titulo-papel">
+      <h2 id="titulo-papel">2. Papel deste aparelho</h2>
+      <div class="botoes">
+        <button type="button" id="botao-papel-a">Sou A (gero a oferta)</button>
+        <button type="button" id="botao-papel-b">Sou B (recebo a oferta)</button>
+      </div>
+
+      <div id="painel-a" hidden>
+        <h3>A — Oferta</h3>
+        <button type="button" id="botao-gerar-oferta">Gerar oferta</button>
+        <label for="texto-oferta-a">Oferta (envie para B)</label>
+        <textarea id="texto-oferta-a" rows="4" readonly spellcheck="false"></textarea>
+        <button type="button" id="botao-copiar-oferta" disabled>Copiar oferta</button>
+        <label for="texto-resposta-a">Resposta recebida de B</label>
+        <textarea id="texto-resposta-a" rows="4" spellcheck="false"></textarea>
+        <button type="button" id="botao-aplicar-resposta" disabled>Aplicar resposta</button>
+      </div>
+
+      <div id="painel-b" hidden>
+        <h3>B — Resposta</h3>
+        <label for="texto-oferta-b">Oferta recebida de A</label>
+        <textarea id="texto-oferta-b" rows="4" spellcheck="false"></textarea>
+        <button type="button" id="botao-gerar-resposta">Gerar resposta</button>
+        <label for="texto-resposta-b">Resposta (envie para A)</label>
+        <textarea id="texto-resposta-b" rows="4" readonly spellcheck="false"></textarea>
+        <button type="button" id="botao-copiar-resposta" disabled>Copiar resposta</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="titulo-estado">
+      <h2 id="titulo-estado">3. Estado</h2>
+      <table>
+        <tbody>
+          <tr><th scope="row">Conexão</th><td id="estado-conexao">—</td></tr>
+          <tr><th scope="row">ICE</th><td id="estado-ice">—</td></tr>
+          <tr><th scope="row">Coleta de candidatos</th><td id="estado-coleta">—</td></tr>
+          <tr><th scope="row">Sinalização</th><td id="estado-sinalizacao">—</td></tr>
+          <tr><th scope="row">Canal "controle"</th><td id="estado-canal-controle">—</td></tr>
+          <tr><th scope="row">Canal "dados"</th><td id="estado-canal-dados">—</td></tr>
+          <tr><th scope="row">Candidatos no SDP local</th><td id="candidatos-locais">—</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="titulo-par">
+      <h2 id="titulo-par">4. Par de candidatos selecionado</h2>
+      <table>
+        <tbody>
+          <tr><th scope="row">Caminho</th><td id="par-caminho">—</td></tr>
+          <tr><th scope="row">Candidato local</th><td id="par-local">—</td></tr>
+          <tr><th scope="row">Candidato remoto</th><td id="par-remoto">—</td></tr>
+          <tr><th scope="row">Tempo de ida e volta</th><td id="par-rtt">—</td></tr>
+        </tbody>
+      </table>
+      <button type="button" id="botao-atualizar-par" disabled>Atualizar</button>
+    </section>
+
+    <section aria-labelledby="titulo-mensagem">
+      <h2 id="titulo-mensagem">5. Mensagem de teste (canal "controle")</h2>
+      <div class="botoes">
+        <input type="text" id="texto-mensagem" maxlength="200" value="olá" aria-label="Mensagem de teste">
+        <button type="button" id="botao-enviar-mensagem" disabled>Enviar</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="titulo-registro">
+      <h2 id="titulo-registro">Registro de eventos</h2>
+      <ol id="registro" class="registro"></ol>
+    </section>
+  </main>
+  <script type="module" src="js/prototipo.js"></script>
+</body>
+</html>

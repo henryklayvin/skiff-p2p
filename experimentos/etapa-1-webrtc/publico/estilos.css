@@ -59,3 +59,56 @@ pre {
   word-break: break-all;
   font-size: 0.85rem;
 }
+
+section {
+  margin-bottom: 24px;
+}
+
+label {
+  display: block;
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+textarea,
+input[type="text"] {
+  box-sizing: border-box;
+  width: 100%;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+button {
+  margin-top: 8px;
+  padding: 8px 14px;
+  font-size: 1rem;
+}
+
+.botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.botoes input[type="text"] {
+  flex: 1 1 160px;
+  width: auto;
+  margin-top: 8px;
+  padding: 8px;
+}
+
+.dica {
+  font-size: 0.85rem;
+  color: var(--cor-neutra);
+}
+
+.registro {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.8rem;
+  padding-left: 1.5rem;
+}
+
+[hidden] {
+  display: none !important;
+}
