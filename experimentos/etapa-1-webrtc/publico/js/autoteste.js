@@ -13,6 +13,8 @@ import {
   responderOferta,
 } from './conexao.js';
 import { classificarCaminho, obterParSelecionado } from './estatisticas.js';
+import { criarCanalDeControle } from './controle.js';
+import { criarMedidorDeLatencia } from './latencia.js';
 
 const comPrazo = (promessa, ms, descricao) => Promise.race([
   promessa,
@@ -59,6 +61,11 @@ async function executarAutoteste() {
   const parA = await obterParSelecionado(ladoA.conexao);
   const parB = await obterParSelecionado(ladoB.conexao);
 
+  // P3: latência do "controle" com o canal ocioso, medida a partir de A (B responde automaticamente).
+  const medidorEmA = criarMedidorDeLatencia(criarCanalDeControle(ladoA.canais.controle));
+  criarMedidorDeLatencia(criarCanalDeControle(ladoB.canais.controle));
+  const latencia = await medidorEmA.medir({ quantidade: 20, intervaloMs: 20 });
+
   const verificacoes = {
     canaisAbertos: todosOsCanais.every((canal) => canal.readyState === 'open'),
     controleDeAParaB: JSON.parse(textoEmB).texto === 'de A para B',
@@ -66,6 +73,7 @@ async function executarAutoteste() {
     dadosBinarios: bytesEmB instanceof ArrayBuffer && new Uint8Array(bytesEmB).join(',') === '1,2,3,4',
     parSelecionadoEmA: parA?.estado === 'succeeded',
     parSelecionadoEmB: parB?.estado === 'succeeded',
+    latenciaMedida: latencia.resumo.quantidade === 20 && latencia.perdidas === 0,
   };
 
   for (const lado of [ladoA, ladoB]) {
@@ -81,6 +89,7 @@ async function executarAutoteste() {
     candidatosNaResposta: contarCandidatos(JSON.parse(resposta.texto).sdp),
     parSelecionado: { ladoA: parA, ladoB: parB },
     caminho: classificarCaminho(parA),
+    latenciaDoControle: { ...latencia.resumo, perdidas: latencia.perdidas },
     navegador: navigator.userAgent,
   };
 }

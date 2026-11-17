@@ -72,8 +72,11 @@ describe('autoteste no navegador', { skip: motivoParaIgnorar, timeout: 90_000 },
       dadosBinarios: true,
       parSelecionadoEmA: true,
       parSelecionadoEmB: true,
+      latenciaMedida: true,
     });
     assert.equal(resultado.aprovado, true);
+    // Na mesma máquina a latência deve ser baixa; o limite é folgado para não falhar por oscilação.
+    assert.ok(resultado.latenciaDoControle.mediana < 50, `mediana alta: ${resultado.latenciaDoControle.mediana} ms`);
     assert.ok(resultado.candidatosNaOferta.host + resultado.candidatosNaOferta.srflx > 0, 'a oferta deveria conter candidatos');
     assert.ok(resultado.parSelecionado.ladoA.local.tipo, 'o par selecionado deveria informar o tipo do candidato local');
   });

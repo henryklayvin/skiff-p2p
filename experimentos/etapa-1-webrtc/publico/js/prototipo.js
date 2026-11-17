@@ -9,10 +9,13 @@ import {
   responderOferta,
 } from './conexao.js';
 import { classificarCaminho, obterParSelecionado } from './estatisticas.js';
+import { criarCanalDeControle } from './controle.js';
+import { criarMedidorDeLatencia } from './latencia.js';
+import { formatarMs } from './metricas.js';
 
 const elemento = (id) => document.getElementById(id);
 
-let sessao = null; // { conexao, canais }
+let sessao = null; // { conexao, canais, controle, medidorDeLatencia }
 let atualizacaoPeriodica = null;
 
 // ---------- registro de eventos (sem SDP e sem endereços IP) ----------
@@ -101,6 +104,7 @@ function iniciarSessao() {
       if (nome === 'controle') {
         elemento('botao-enviar-mensagem').disabled = false;
         elemento('botao-atualizar-par').disabled = false;
+        elemento('botao-medir-latencia').disabled = false;
       }
     });
     canal.addEventListener('close', () => {
@@ -109,15 +113,10 @@ function iniciarSessao() {
     });
   }
 
-  sessao.canais.controle.addEventListener('message', (evento) => {
-    let mensagem;
-    try {
-      mensagem = JSON.parse(evento.data);
-    } catch {
-      registrar('Mensagem inválida recebida no canal "controle"');
-      return;
-    }
-    if (mensagem.tipo === 'mensagem-de-teste' && typeof mensagem.texto === 'string') {
+  sessao.controle = criarCanalDeControle(sessao.canais.controle, registrar);
+  sessao.medidorDeLatencia = criarMedidorDeLatencia(sessao.controle);
+  sessao.controle.aoReceber('mensagem-de-teste', (mensagem) => {
+    if (typeof mensagem.texto === 'string') {
       registrar(`Recebido no "controle": "${mensagem.texto.slice(0, 200)}"`);
     }
   });
@@ -224,6 +223,32 @@ elemento('botao-atualizar-par').addEventListener('click', () => executar(atualiz
 
 elemento('botao-enviar-mensagem').addEventListener('click', () => executar(async () => {
   const texto = elemento('texto-mensagem').value.slice(0, 200);
-  sessao.canais.controle.send(JSON.stringify({ tipo: 'mensagem-de-teste', texto }));
+  sessao.controle.enviar({ tipo: 'mensagem-de-teste', texto });
   registrar(`Enviado no "controle": "${texto}"`);
 }, 'enviar a mensagem'));
+
+function lerInteiro(id, minimo, maximo) {
+  const valor = Number.parseInt(elemento(id).value, 10);
+  if (!Number.isInteger(valor) || valor < minimo || valor > maximo) {
+    throw new Error(`"${elemento(id).labels?.[0]?.textContent ?? id}" deve estar entre ${minimo} e ${maximo}.`);
+  }
+  return valor;
+}
+
+elemento('botao-medir-latencia').addEventListener('click', () => executar(async () => {
+  const quantidade = lerInteiro('quantidade-de-sondas', 1, 500);
+  const intervaloMs = lerInteiro('intervalo-entre-sondas', 0, 5_000);
+  elemento('botao-medir-latencia').disabled = true;
+  registrar(`Medindo latência: ${quantidade} sondas, intervalo de ${intervaloMs} ms...`);
+  try {
+    const { resumo, perdidas } = await sessao.medidorDeLatencia.medir({ quantidade, intervaloMs });
+    elemento('latencia-amostras').textContent = `${resumo.quantidade} respondidas, ${perdidas} sem resposta`;
+    elemento('latencia-minimo').textContent = formatarMs(resumo.minimo);
+    elemento('latencia-mediana').textContent = formatarMs(resumo.mediana);
+    elemento('latencia-p95').textContent = formatarMs(resumo.p95);
+    elemento('latencia-maximo').textContent = formatarMs(resumo.maximo);
+    registrar(`Latência do "controle": mediana ${formatarMs(resumo.mediana)}, p95 ${formatarMs(resumo.p95)}, máximo ${formatarMs(resumo.maximo)}, ${perdidas} sem resposta`);
+  } finally {
+    elemento('botao-medir-latencia').disabled = false;
+  }
+}, 'medir a latência'));

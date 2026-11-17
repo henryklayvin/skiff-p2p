@@ -86,6 +86,27 @@
       </div>
     </section>
 
+    <section aria-labelledby="titulo-latencia">
+      <h2 id="titulo-latencia">6. Latência do canal "controle"</h2>
+      <p class="dica">Envia sondas uma de cada vez e mede o tempo de ida e volta no relógio deste aparelho. O outro lado responde automaticamente.</p>
+      <div class="botoes">
+        <label for="quantidade-de-sondas">Sondas</label>
+        <input type="number" id="quantidade-de-sondas" min="1" max="500" value="20">
+        <label for="intervalo-entre-sondas">Intervalo (ms)</label>
+        <input type="number" id="intervalo-entre-sondas" min="0" max="5000" value="100">
+        <button type="button" id="botao-medir-latencia" disabled>Medir latência</button>
+      </div>
+      <table>
+        <tbody>
+          <tr><th scope="row">Amostras</th><td id="latencia-amostras">—</td></tr>
+          <tr><th scope="row">Mínimo</th><td id="latencia-minimo">—</td></tr>
+          <tr><th scope="row">Mediana</th><td id="latencia-mediana">—</td></tr>
+          <tr><th scope="row">p95</th><td id="latencia-p95">—</td></tr>
+          <tr><th scope="row">Máximo</th><td id="latencia-maximo">—</td></tr>
+        </tbody>
+      </table>
+    </section>
+
     <section aria-labelledby="titulo-registro">
       <h2 id="titulo-registro">Registro de eventos</h2>
       <ol id="registro" class="registro"></ol>

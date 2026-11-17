@@ -91,6 +91,16 @@ button {
   align-items: center;
 }
 
+.botoes label {
+  margin-top: 8px;
+}
+
+.botoes input[type="number"] {
+  width: 6rem;
+  margin-top: 8px;
+  padding: 8px;
+}
+
 .botoes input[type="text"] {
   flex: 1 1 160px;
   width: auto;

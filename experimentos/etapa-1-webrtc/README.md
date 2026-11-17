@@ -11,7 +11,8 @@
 | P0 | Preparação: arquivos de teste, CA local, certificados, registros | Concluído |
 | P1 | Servidor HTTPS estático e página de diagnóstico | Concluído: PC, iPhone e emulador Android abrem sem alerta |
 | P2 | Conexão WebRTC por troca manual de SDP | Concluído: duas abas e PC ↔ iPhone conectados; PC ↔ emulador falhou (ver `resultados.md`) |
-| P3 a P11 | Transferência, coturn, testes e relatório | Pendentes |
+| P3 | Latência do canal `controle` com o canal ocioso | Implementado e testado automaticamente; validação manual pendente |
+| P4 a P11 | Transferência, coturn, testes e relatório | Pendentes |
 
 ## Arquivos deste diretório
 
@@ -30,6 +31,10 @@
 | `publico/autoteste.html` | Autoteste: lados A e B na mesma página, usado pelos testes automáticos |
 | `publico/js/conexao.js` | Criação da conexão, canais `controle` e `dados`, oferta e resposta com coleta completa de candidatos |
 | `publico/js/estatisticas.js` | Par de candidatos selecionado (`getStats`) e classificação direta/retransmitida |
+| `publico/js/controle.js` | Canal `controle`: validação das mensagens JSON (tamanho, formato, `tipo`) e entrega por tipo |
+| `publico/js/latencia.js` | Medição de latência do `controle` por sondas (`sonda` / `resposta-sonda`) |
+| `publico/js/metricas.js` | Funções puras de métricas (percentis, resumo, formatação) |
+| `metricas.test.mjs` | Testes unitários das métricas, executados no Node |
 
 ## Executar o servidor
 
