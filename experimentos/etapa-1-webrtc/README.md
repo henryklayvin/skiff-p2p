@@ -11,7 +11,7 @@
 | P0 | Preparação: arquivos de teste, CA local, certificados, registros | Concluído |
 | P1 | Servidor HTTPS estático e página de diagnóstico | Concluído: PC, iPhone e emulador Android abrem sem alerta |
 | P2 | Conexão WebRTC por troca manual de SDP | Concluído: duas abas e PC ↔ iPhone conectados; PC ↔ emulador falhou (ver `resultados.md`) |
-| P3 | Latência do canal `controle` com o canal ocioso | Implementado e testado automaticamente; validação manual pendente |
+| P3 | Latência do canal `controle` com o canal ocioso | Concluído: mediana de cerca de 5 ms entre PC e iPhone (ver `resultados.md`) |
 | P4 a P11 | Transferência, coturn, testes e relatório | Pendentes |
 
 ## Arquivos deste diretório

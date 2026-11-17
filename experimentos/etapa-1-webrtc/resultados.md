@@ -34,6 +34,20 @@ Configuração ICE em todos os testes: `stun:stun.l.google.com:19302`.
    - **É uma limitação do emulador**, não do produto: um Android físico no mesmo Wi-Fi resolve mDNS, como aconteceu com o IOS-1.
    - **O TURN local (P10) deve resolver esse caso**, porque os dois lados alcançam o coturn no IP de rede do PC-1.
 
+## P3 — Latência do canal `controle` com o canal ocioso (2026-11-17)
+
+20 sondas, uma de cada vez, com intervalo de 100 ms. Tempo de ida e volta medido no relógio de quem envia.
+
+| Par | Quem mediu | Respondidas | Mínimo | Mediana | p95 | Máximo |
+|---|---|---|---|---|---|---|
+| PC-1 ↔ IOS-1 (Wi-Fi, direta) | PC-1 | 20 de 20 | 4,4 ms | 5,0 ms | 10,3 ms | 12,3 ms |
+| PC-1 ↔ IOS-1 (Wi-Fi, direta) | IOS-1 | 20 de 20 | 4,4 ms | 5,1 ms | 8,2 ms | 11,9 ms |
+| Duas abas no PC-1 | Aba 1 | 20 de 20 | 0,5 ms | 0,6 ms | 0,7 ms | 1,5 ms |
+| Duas abas no PC-1 | Aba 2 | 20 de 20 | 0,5 ms | 0,6 ms | 0,7 ms | 1,1 ms |
+| Autoteste (Chrome headless, mesma página) | Lado A | 20 de 20 | 0,45 ms | 0,55 ms | 0,76 ms | 1,27 ms |
+
+**Leitura:** são as referências de latência **sem carga** no canal `dados`. Entre PC e iPhone, a mediana fica em cerca de 5 ms, com picos de até cerca de 12 ms. Elas serão comparadas com a latência medida durante transferências, que é o que importa para cancelamentos e confirmações.
+
 ### Pendências
 
 - Confirmar a causa do item 4, desativando temporariamente a ocultação do IP local no Chrome do PC-1 (teste opcional) ou validando a conexão via TURN no P10.
