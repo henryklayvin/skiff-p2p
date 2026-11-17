@@ -133,6 +133,14 @@
         <label for="atraso-de-gravacao">Ao receber: atraso artificial de gravação (ms por MiB, só para testes)</label>
         <input type="number" id="atraso-de-gravacao" min="0" max="10000" value="0">
       </div>
+      <div class="botoes">
+        <label for="falha-provocada">Falha provocada (só para testes)</label>
+        <select id="falha-provocada">
+          <option value="nenhuma" selected>Nenhuma</option>
+          <option value="corromper-bloco">Corromper um bloco</option>
+          <option value="pular-bloco">Pular um bloco</option>
+        </select>
+      </div>
       <button type="button" id="botao-enviar-arquivo" disabled>Enviar arquivo</button>
 
       <h3>Envio</h3>
@@ -147,6 +155,7 @@
           <tr><th scope="row">Janela não confirmada atual / maior</th><td id="envio-janela">—</td></tr>
           <tr><th scope="row">Pausas por buffer / por janela</th><td id="envio-pausas">—</td></tr>
           <tr><th scope="row">Confirmações recebidas</th><td id="envio-confirmacoes">—</td></tr>
+          <tr><th scope="row">SHA-256 calculado na leitura</th><td id="envio-hash" class="hash">—</td></tr>
           <tr><th scope="row">Duração / vazão</th><td id="envio-vazao">—</td></tr>
           <tr><th scope="row">Memória desta aba (inicial / máxima / final)</th><td id="envio-memoria">—</td></tr>
         </tbody>
@@ -160,6 +169,7 @@
           <tr><th scope="row">Recebidos</th><td id="recebimento-bytes">—</td></tr>
           <tr><th scope="row">Gravados e confirmados</th><td id="recebimento-confirmados">—</td></tr>
           <tr><th scope="row">Confirmações enviadas</th><td id="recebimento-confirmacoes">—</td></tr>
+          <tr><th scope="row">Verificação SHA-256</th><td id="recebimento-hash" class="hash">—</td></tr>
           <tr><th scope="row">Duração / vazão</th><td id="recebimento-vazao">—</td></tr>
           <tr><th scope="row">Memória desta aba (inicial / máxima / final)</th><td id="recebimento-memoria">—</td></tr>
           <tr><th scope="row">Arquivo</th><td><a id="link-download" hidden>Baixar</a></td></tr>
@@ -172,6 +182,7 @@
       <ol id="registro" class="registro"></ol>
     </section>
   </main>
+  <script src="vendor/hash-wasm/sha256.umd.min.js"></script>
   <script type="module" src="js/prototipo.js"></script>
 </body>
 </html>

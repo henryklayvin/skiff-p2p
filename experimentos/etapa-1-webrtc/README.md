@@ -14,7 +14,8 @@
 | P3 | Latência do canal `controle` com o canal ocioso | Concluído: mediana de cerca de 5 ms entre PC e iPhone (ver `resultados.md`) |
 | P4 | Envio em blocos de 16 KiB com controle de fluxo local; destino em Blob | Concluído: 100 MiB íntegros com remetente estável (máximo de 2,7 MiB); 50 MiB PC → iPhone a 28 MiB/s |
 | P5 | Confirmações (ACK) e janela ponta a ponta de 8 MiB | Concluído: janela limitada a 8 MiB com o iPhone lento; 50 MiB PC → iPhone a 29–32 MiB/s |
-| P6 a P11 | Hash, cancelamento, destinos, coturn, testes e relatório | Pendentes |
+| P6 | SHA-256 incremental (hash-wasm 4.12.0) e falhas provocadas | Implementado e testado automaticamente; validação no iPhone pendente |
+| P7 a P11 | Cancelamento, destinos, recursos móveis, coturn, testes e relatório | Pendentes |
 
 ## Arquivos deste diretório
 
@@ -44,6 +45,9 @@
 | `publico/js/destinos.js` | Destino dos arquivos recebidos (Blob) e destino com atraso artificial, para simular gravação lenta |
 | `publico/js/nomes.js` | Sanitização de nomes de arquivos recebidos |
 | `publico/js/memoria.js` | Memória da própria aba (`measureUserAgentSpecificMemory`), amostrada durante a transferência |
+| `publico/js/hash.js` | SHA-256 incremental com a biblioteca candidata hash-wasm |
+| `publico/vendor/hash-wasm/` | **Código de terceiros** (hash-wasm 4.12.0, MIT): só o arquivo de SHA-256, com origem e hash registrados no README |
+| `hash.test.mjs` | Vetores de teste do SHA-256 e conferência do arquivo de 10 MiB |
 | `transferencia.test.mjs` | Testes unitários do formato dos blocos, dos nomes e da formatação |
 
 ## Executar o servidor

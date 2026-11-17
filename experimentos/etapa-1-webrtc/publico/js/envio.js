@@ -8,7 +8,8 @@
 //   destinatário -> aceitar-transferencia  (ou recusar-transferencia)
 //   remetente    -> blocos no canal "dados"
 //   destinatário -> confirmacao            (bytes gravados, a cada 1 MiB ou 250 ms)
-//   destinatário -> arquivo-recebido       (todos os bytes gravados)
+//   remetente    -> arquivo-concluido      (SHA-256 calculado durante a leitura)        [P6]
+//   destinatário -> arquivo-verificado     (hash conferiu) ou arquivo-falhou            [P6]
 //
 // Os blocos só começam depois do aceite: "controle" e "dados" são canais diferentes,
 // sem garantia de ordem entre eles.
@@ -20,6 +21,10 @@
 
 import { PARAMETROS_PADRAO } from './parametros.js';
 import { conteudoPorBloco, gerarIdDeTransferencia, montarBloco } from './protocolo-de-dados.js';
+import { criarCalculadoraSha256 } from './hash.js';
+
+// Falhas provocadas de propósito, para comprovar a detecção (P6). Aplicadas ao bloco do meio.
+export const FALHAS_PROVOCADAS = Object.freeze(['nenhuma', 'corromper-bloco', 'pular-bloco']);
 
 /** Promessa que é rejeitada quando abortar() é chamado. Usada com Promise.race. */
 function criarAbortador() {
@@ -78,9 +83,13 @@ export async function enviarArquivo({
   canalDeDados,
   controle,
   parametros = PARAMETROS_PADRAO,
+  falhaProvocada = 'nenhuma',
   aoProgredir = () => {},
   aoRegistrar = () => {},
 }) {
+  if (!FALHAS_PROVOCADAS.includes(falhaProvocada)) {
+    throw new Error(`Falha provocada desconhecida: ${falhaProvocada}`);
+  }
   const {
     tamanhoDoBloco, tamanhoDaLeitura, limiarAltoDoBuffer, limiarBaixoDoBuffer, prazoDeAceiteMs,
     intervaloDeConfirmacaoBytes, intervaloDeConfirmacaoMs, janelaDeBytesNaoConfirmados, prazoSemConfirmacaoMs,
@@ -98,6 +107,8 @@ export async function enviarArquivo({
   const idTransferencia = gerarIdDeTransferencia();
   const indiceDoArquivo = 0;
   const bytesPorBloco = conteudoPorBloco(tamanhoDoBloco);
+  const blocoAlvoDaFalha = Math.floor(Math.ceil(arquivo.size / bytesPorBloco) / 2);
+  const hash = await criarCalculadoraSha256();
   canalDeDados.bufferedAmountLowThreshold = limiarBaixoDoBuffer;
 
   // ---------- 1. Oferta e aceite ----------
@@ -180,8 +191,21 @@ export async function enviarArquivo({
     }
   };
 
-  // A confirmação final é registrada antes de enviar o último bloco, para não perdê-la.
-  const confirmacaoFinal = aguardarMensagem(controle, ['arquivo-recebido', 'erro-transferencia'], idTransferencia, 0);
+  // A resposta final é registrada antes de enviar o último bloco, para não perdê-la.
+  const confirmacaoFinal = aguardarMensagem(
+    controle,
+    ['arquivo-verificado', 'arquivo-falhou', 'erro-transferencia'],
+    idTransferencia,
+    0,
+  );
+  // Um erro informado pelo destinatário no meio do envio interrompe o envio imediatamente.
+  confirmacaoFinal.then((mensagem) => {
+    if (mensagem.tipo === 'erro-transferencia') {
+      abortador.abortar(new Error(`O destinatário informou erro: ${mensagem.motivo}`));
+    } else if (mensagem.tipo === 'arquivo-falhou') {
+      abortador.abortar(new Error(`Falha de integridade informada pelo destinatário: ${mensagem.motivo}`));
+    }
+  });
 
   try {
     // ---------- 3. Leitura em partes e envio em blocos ----------
@@ -190,8 +214,20 @@ export async function enviarArquivo({
         arquivo.slice(posicao, posicao + tamanhoDaLeitura).arrayBuffer(),
         abortador.promessa,
       ]));
+      hash.atualizar(parte); // hash do conteúdo ORIGINAL, durante a leitura
       for (let deslocamento = 0; deslocamento < parte.byteLength; deslocamento += bytesPorBloco) {
-        const conteudo = parte.subarray(deslocamento, deslocamento + bytesPorBloco);
+        let conteudo = parte.subarray(deslocamento, deslocamento + bytesPorBloco);
+
+        if (sequencia === blocoAlvoDaFalha && falhaProvocada === 'pular-bloco') {
+          aoRegistrar(`Falha provocada: bloco ${sequencia} não será enviado`);
+          sequencia++;
+          continue;
+        }
+        if (sequencia === blocoAlvoDaFalha && falhaProvocada === 'corromper-bloco') {
+          conteudo = conteudo.slice(); // cópia: não altera o que já entrou no hash
+          conteudo[0] ^= 0xff;
+          aoRegistrar(`Falha provocada: primeiro byte do bloco ${sequencia} invertido`);
+        }
 
         // Janela ponta a ponta: não passa de N bytes sem confirmação.
         if (naoConfirmados() + conteudo.byteLength > janelaDeBytesNaoConfirmados) {
@@ -214,12 +250,17 @@ export async function enviarArquivo({
     }
     informarProgresso(true);
     const envioConcluidoEm = performance.now();
-    aoRegistrar(`Todos os ${sequencia} blocos entregues ao send(); aguardando o destinatário`);
+    const sha256 = hash.finalizar();
+    controle.enviar({ tipo: 'arquivo-concluido', idTransferencia, indiceDoArquivo, sha256 });
+    aoRegistrar(`Todos os ${sequencia} blocos entregues ao send(); SHA-256 enviado; aguardando a verificação`);
 
-    // ---------- 4. Confirmação final ----------
+    // ---------- 4. Verificação final pelo destinatário ----------
     const final = await Promise.race([confirmacaoFinal, abortador.promessa]);
     if (final.tipo === 'erro-transferencia') {
       throw new Error(`O destinatário informou erro: ${final.motivo}`);
+    }
+    if (final.tipo === 'arquivo-falhou') {
+      throw new Error(`Falha de integridade informada pelo destinatário: ${final.motivo}`);
     }
     bytesConfirmados = Math.max(bytesConfirmados, final.bytesRecebidos);
     informarProgresso(true);
@@ -236,6 +277,8 @@ export async function enviarArquivo({
       pausasPorJanelaCheia,
       confirmacoesRecebidas,
       marcosConfirmadosMs,
+      sha256,
+      hash: hash.estatisticas(),
       duracaoAteEntregarAoSendMs: envioConcluidoEm - inicio,
       duracaoMs,
       vazaoMiBs: arquivo.size / (1024 * 1024) / (duracaoMs / 1000),

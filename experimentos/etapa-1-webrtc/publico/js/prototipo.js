@@ -302,6 +302,7 @@ function prepararRecebimento() {
       elemento('recebimento-bytes').textContent = `${formatarBytes(resultado.bytesRecebidos)} em ${resultado.blocos} blocos`;
       elemento('recebimento-confirmados').textContent = formatarBytes(resultado.bytesRecebidos);
       elemento('recebimento-confirmacoes').textContent = String(resultado.confirmacoesEnviadas);
+      elemento('recebimento-hash').textContent = `✅ conferido: ${resultado.sha256} (hash: ${resultado.hash.tempoMs.toFixed(0)} ms, ${resultado.hash.vazaoMiBs?.toFixed(0) ?? '—'} MiB/s)`;
       elemento('recebimento-vazao').textContent = descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs);
       if (urlDoUltimoArquivo) {
         URL.revokeObjectURL(urlDoUltimoArquivo);
@@ -319,6 +320,8 @@ function prepararRecebimento() {
     },
     aoFalhar: (erro) => {
       elemento('recebimento-estado').textContent = `falhou: ${erro.message}`;
+      elemento('recebimento-hash').textContent = '❌ arquivo descartado; nada é oferecido para download';
+      elemento('link-download').hidden = true;
       registrar(`Recebimento falhou: ${erro.message}`);
       finalizarAmostragem();
     },
@@ -363,6 +366,7 @@ elemento('botao-enviar-arquivo').addEventListener('click', () => executar(async 
       canalDeDados: sessao.canais.dados,
       controle: sessao.controle,
       parametros,
+      falhaProvocada: elemento('falha-provocada').value,
       aoRegistrar: registrar,
       aoProgredir: ({ bytesEnviados, bytesConfirmados, total, bufferAtual, maiorBufferObservado, janelaAtual, maiorJanelaObservada }) => {
         progressoDoEnvio = total > 0 ? bytesConfirmados / total : 1;
@@ -378,9 +382,10 @@ elemento('botao-enviar-arquivo').addEventListener('click', () => executar(async 
     elemento('envio-confirmados').textContent = `${formatarBytes(resultado.bytesConfirmados)} (100.0%)`;
     elemento('envio-janela').textContent = `maior: ${formatarBytes(resultado.maiorJanelaObservada)}`;
     elemento('envio-confirmacoes').textContent = String(resultado.confirmacoesRecebidas);
+    elemento('envio-hash').textContent = `${resultado.sha256} (hash: ${resultado.hash.tempoMs.toFixed(0)} ms, ${resultado.hash.vazaoMiBs?.toFixed(0) ?? '—'} MiB/s)`;
     // Acesso para os testes automáticos coletarem as métricas completas do envio.
     window.ultimoEnvio = resultado;
-    elemento('envio-estado').textContent = 'concluído (destinatário confirmou o recebimento)';
+    elemento('envio-estado').textContent = 'concluído (destinatário verificou o SHA-256)';
     elemento('envio-buffer').textContent = `maior: ${formatarBytes(resultado.maiorBufferObservado)}`;
     elemento('envio-pausas').textContent = `${resultado.pausasPorBufferCheio} / ${resultado.pausasPorJanelaCheia}`;
     elemento('envio-vazao').textContent = descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs);

@@ -143,6 +143,32 @@ Latência do `controle` medida no PC-1 **durante** o 2º envio (20 sondas): 20 d
 3. **Latência sob carga:** a mediana sobe de cerca de 5 ms para cerca de 17 ms e o p95 chega a cerca de 100 ms. Um cancelamento ou uma confirmação podem levar até cerca de 100 ms para atravessar o `controle` durante a transferência, valor aceitável para a interface. O tempo real do cancelamento é medido no P7.
 4. No Safari, a memória da aba não pode ser medida (API indisponível), como previsto.
 
+## P6 — SHA-256 incremental e falhas provocadas (2026-11-17)
+
+**Implementação:**
+- Biblioteca candidata `hash-wasm` 4.12.0, baixada com aprovação do desenvolvedor. Só o arquivo de SHA-256 entrou no repositório, em `publico/vendor/hash-wasm/`, com a origem e o SHA-256 registrados.
+- O remetente calcula o hash **durante a leitura**, em partes de 1 MiB, e o envia em `arquivo-concluido`.
+- O destinatário calcula o hash dos blocos na ordem em que chegam e compara.
+- O arquivo só é oferecido para download depois de `arquivo-verificado`. Em caso de divergência: `arquivo-falhou`, descarte dos dados e nenhum download.
+- Falhas provocadas, aplicadas ao bloco do meio: **corromper um bloco** (inverte o primeiro byte, depois de o conteúdo original entrar no hash) e **pular um bloco**.
+
+**Testes automáticos:**
+
+| Teste | Resultado |
+|---|---|
+| Vetores de teste do SHA-256 (vazio, "abc", 448 bits) e cálculo em partes igual ao cálculo de uma vez (Node) | ✅ |
+| Arquivo de 10 MiB lido em blocos de 16.368 bytes, no Node | ✅ hash igual ao de referência |
+| 10 MiB e 100 MiB entre duas abas | ✅ hash do remetente igual ao de referência; destinatário verificou |
+| Velocidade do hash no Chrome (remetente) | 10 MiB em 40 ms (248 MiB/s); 100 MiB em 424 ms (236 MiB/s) |
+| Bloco corrompido | ✅ detectado: "SHA-256 divergente"; nada oferecido para download |
+| Bloco pulado | ✅ detectado: "bloco fora de ordem: esperado 320, recebido 321"; nada oferecido para download |
+| Transferência normal depois das falhas | ✅ |
+
+**Constatações:**
+1. **O hash incremental não é gargalo:** cerca de 240 MiB/s no Chrome, contra 15 a 30 MiB/s de transferência.
+2. **As duas camadas de verificação são complementares:** a sequência dos blocos detecta perda e desordem na hora; o SHA-256 detecta conteúdo alterado no fim.
+3. A latência do `controle` durante a transferência de 100 MiB se manteve: mediana de 14,4 ms, p95 de 25,7 ms (mesma máquina).
+
 ### Pendências
 
 - Confirmar a causa do item 4, desativando temporariamente a ocultação do IP local no Chrome do PC-1 (teste opcional) ou validando a conexão via TURN no P10.

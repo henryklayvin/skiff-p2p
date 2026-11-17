@@ -56,9 +56,9 @@ const HASH_DO_DOWNLOAD = `(async () => {
 })()`;
 
 /** Envia um arquivo do disco de A para B pela interface e devolve o que B recebeu e as métricas de A. */
-async function transferirPeloPrototipo(paginaA, paginaB, caminhoDoArquivo, limiteMs, { medirLatencia = false } = {}) {
-  await paginaB.avaliar('window.ultimoArquivoRecebido = null; true');
-  await paginaA.avaliar(`window.ultimoEnvio = null; ${porId('latencia-amostras')}.textContent = '—'; true`);
+async function transferirPeloPrototipo(paginaA, paginaB, caminhoDoArquivo, limiteMs, { medirLatencia = false, falha = 'nenhuma' } = {}) {
+  await paginaB.avaliar('window.ultimoArquivoRecebido = null; window.ultimaMemoria.recebimento = null; true');
+  await paginaA.avaliar(`window.ultimoEnvio = null; ${porId('latencia-amostras')}.textContent = '—'; ${porId('falha-provocada')}.value = ${JSON.stringify(falha)}; true`);
   await paginaA.definirArquivos('#arquivo-para-enviar', [caminhoDoArquivo]);
   await paginaA.avaliar(`${porId('botao-enviar-arquivo')}.click(); true`);
   if (medirLatencia) {
@@ -199,6 +199,11 @@ describe('autoteste no navegador', { skip: motivoParaIgnorar, timeout: 300_000 }
           contexto.diagnostic(`${nome} latência do controle durante a transferência: ${JSON.stringify(latencia)}`);
         }
 
+        // P6: hash incremental calculado na leitura igual ao de referência; destinatário verificou.
+        assert.equal(envio.sha256, hashes[nome], 'o SHA-256 incremental do remetente deveria ser igual ao de referência');
+        assert.match(estadoDoEnvio, /verificou o SHA-256/);
+        contexto.diagnostic(`${nome} hash no remetente: ${Math.round(envio.hash.tempoMs)} ms (${Math.round(envio.hash.vazaoMiBs)} MiB/s)`);
+
         // P5: confirmações e janela.
         assert.equal(envio.bytesConfirmados, statSync(caminho).size, 'todos os bytes deveriam estar confirmados');
         assert.ok(envio.confirmacoesRecebidas > 0, 'deveria haver confirmações do destinatário');
@@ -235,6 +240,31 @@ describe('autoteste no navegador', { skip: motivoParaIgnorar, timeout: 300_000 }
       } finally {
         await paginaB.avaliar(`${porId('atraso-de-gravacao')}.value = '0'; true`);
       }
+    });
+
+    const caminho10 = join(PASTA_ARQUIVOS_DE_TESTE, 'teste-10mib.bin');
+    const falhasProvocadas = [
+      ['corromper-bloco', /Falha de integridade.*SHA-256 divergente/],
+      ['pular-bloco', /bloco fora de ordem/],
+    ];
+    for (const [falha, mensagemEsperada] of falhasProvocadas) {
+      test(`deveDetectarFalhaProvocada ${falha} sem oferecer o arquivo para download`, { skip: !existsSync(caminho10) && 'teste-10mib.bin não encontrado' }, async (contexto) => {
+        const { estadoDoEnvio } = await transferirPeloPrototipo(paginaA, paginaB, caminho10, 60_000, { falha });
+        const estadoDoRecebimento = await paginaB.avaliar(`${porId('recebimento-estado')}.textContent`);
+        contexto.diagnostic(`${falha}: remetente "${estadoDoEnvio}" | destinatário "${estadoDoRecebimento}"`);
+
+        assert.match(estadoDoEnvio, /^falhou/, estadoDoEnvio);
+        assert.match(estadoDoEnvio, mensagemEsperada);
+        assert.match(estadoDoRecebimento, /^falhou/);
+        assert.equal(await paginaB.avaliar('window.ultimoArquivoRecebido'), null, 'nenhum arquivo deveria ser oferecido');
+        assert.equal(await paginaB.avaliar(`${porId('link-download')}.hidden`), true, 'o link de download deveria estar oculto');
+      });
+    }
+
+    test('deveVoltarATransferirNormalmenteDepoisDasFalhas', { skip: !existsSync(caminho10) && 'teste-10mib.bin não encontrado' }, async () => {
+      const { estadoDoEnvio, recebido } = await transferirPeloPrototipo(paginaA, paginaB, caminho10, 60_000);
+      assert.match(estadoDoEnvio, /verificou o SHA-256/);
+      assert.equal(recebido.sha256, hashes['teste-10mib.bin']);
     });
   });
 });
