@@ -115,6 +115,8 @@ export async function abrirNavegador(caminhoDoChrome) {
     '--disable-background-timer-throttling',
     '--disable-renderer-backgrounding',
     '--disable-backgrounding-occluded-windows',
+    // Faz measureUserAgentSpecificMemory() medir na hora, sem esperar a próxima coleta de lixo.
+    '--enable-blink-features=ForceEagerMeasureMemory',
     'about:blank',
   ], { stdio: 'ignore' });
   const saida = new Promise((encerrado) => processo.once('exit', encerrado));

@@ -76,6 +76,27 @@ Nos testes, o SHA-256 é calculado sobre o arquivo inteiro já recebido, só par
    - Hipótese: aquecimento da conexão, como a janela de congestionamento do SCTP crescendo ou a otimização do JavaScript pelo navegador. A confirmar nos testes manuais.
 4. **Vazão estável de cerca de 14 MiB/s** na mesma máquina, com limiares de 1 MiB / 256 KiB. Limiares maiores podem aumentar a vazão; isso será calibrado nos testes manuais.
 
+**Memória medida pela própria aba** (`measureUserAgentSpecificMemory`, Chrome headless, ciclo contínuo de amostras durante a transferência):
+
+| Arquivo | Remetente: inicial / máxima / final | Destinatário (só a aba): inicial / máxima / final |
+|---|---|---|
+| 10 MiB | 0,8 / 2,8 / 0,8 MiB (345 amostras) | 0,7 / 4,7 / 0,8 MiB (350 amostras) |
+| 100 MiB | 0,8 / 2,7 / 0,8 MiB (498 amostras) | 1,3 / 4,8 / 0,8 MiB (579 amostras) |
+
+- **Remetente estável:** enviou 100 MiB com no máximo cerca de 2 MiB acima do inicial, compatível com a leitura de 1 MiB mais o limiar de 1 MiB do buffer. **O critério bloqueante de memória do remetente foi atendido**, com verificação automática no teste (crescimento menor que 32 MiB).
+- **Destinatário:** a aba fica perto de 4 MiB, que é o tamanho do lote antes de virar Blob. **Atenção:** essa medição **não inclui o conteúdo do Blob**, que fica no processo principal do navegador. A memória real do recebimento em Blob cresce com o arquivo; a comparação entre destinos é tarefa do P8.
+- Verificação prévia: reter um `Uint8Array` de 100 MiB elevou a medição da página de 0,5 MiB para 100,5 MiB, e liberá-lo a fez voltar a 0,5 MiB. Isso confirma que a API enxerga os buffers da página.
+
+**Testes manuais** (informados pelo desenvolvedor):
+
+| Teste | Arquivo | Duração | Vazão | Maior buffer | Pausas | Resultado |
+|---|---|---|---|---|---|---|
+| Duas abas no PC-1 (janela normal → anônima) | 100 MiB | 9,63 s | 10,4 MiB/s | 1,0 MiB | 120 | ✅ concluído; 6.500 blocos |
+| PC-1 → IOS-1 (Wi-Fi, direta) | 50 MiB | 1,77 s | 28,3 MiB/s | 1,0 MiB | 39 | ✅ concluído; 3.250 blocos; download normal no iPhone |
+
+- A medição manual de memória pelo Gerenciador de Tarefas do Windows não foi possível, porque ele agrupa todos os processos do Chrome. Foi substituída pela medição da própria aba, acima.
+- **PC-1 → IOS-1 foi mais rápido que entre duas abas do mesmo PC.** Hipótese: nas duas abas, remetente e destinatário disputam o mesmo processador, e o emulador Android também estava em execução.
+
 ### Pendências
 
 - Confirmar a causa do item 4, desativando temporariamente a ocultação do IP local no Chrome do PC-1 (teste opcional) ou validando a conexão via TURN no P10.

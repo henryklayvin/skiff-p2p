@@ -70,14 +70,24 @@ async function transferirPeloPrototipo(paginaA, paginaB, caminhoDoArquivo, limit
     buffer: ${porId('envio-buffer')}.textContent,
     pausas: ${porId('envio-pausas')}.textContent,
   })`);
-  return { estadoDoEnvio, recebido, metricas };
+  // Memória medida separadamente: A mede a si mesma como remetente; B, como destinatário.
+  const memoria = {
+    remetente: await paginaA.aguardarValor('window.ultimaMemoria?.envio ?? null', 60_000),
+    destinatario: await paginaB.aguardarValor('window.ultimaMemoria?.recebimento ?? null', 60_000),
+  };
+  return { estadoDoEnvio, recebido, metricas, memoria };
 }
+
+const emMiB = (bytes) => Math.round((bytes / (1024 * 1024)) * 10) / 10;
+const descreverMemoriaEmMiB = (resumo) => ({
+  inicial: emMiB(resumo.inicialBytes), maxima: emMiB(resumo.maximaBytes), final: emMiB(resumo.finalBytes), amostras: resumo.amostras,
+});
 const caminhoDoChrome = localizarChrome();
 const certificadosDisponiveis = existsSync(join(PASTA_CERTIFICADOS, 'servidor.crt'));
 const motivoParaIgnorar = (!caminhoDoChrome && 'Chrome não encontrado')
   || (!certificadosDisponiveis && 'certificados do P0 não encontrados');
 
-describe('autoteste no navegador', { skip: motivoParaIgnorar, timeout: 90_000 }, () => {
+describe('autoteste no navegador', { skip: motivoParaIgnorar, timeout: 300_000 }, () => {
   let servidor;
   let navegador;
   let origem;
@@ -154,13 +164,19 @@ describe('autoteste no navegador', { skip: motivoParaIgnorar, timeout: 90_000 },
     for (const [nome, limiteMs] of [['teste-10mib.bin', 60_000], ['teste-100mib.bin', 180_000]]) {
       const caminho = join(PASTA_ARQUIVOS_DE_TESTE, nome);
       test(`deveTransferir ${nome} com conteudo identico ao original`, { skip: !existsSync(caminho) && `${nome} não encontrado` }, async (contexto) => {
-        const { estadoDoEnvio, recebido, metricas } = await transferirPeloPrototipo(paginaA, paginaB, caminho, limiteMs);
+        const { estadoDoEnvio, recebido, metricas, memoria } = await transferirPeloPrototipo(paginaA, paginaB, caminho, limiteMs);
         contexto.diagnostic(`${nome}: ${JSON.stringify(metricas)}`);
+        contexto.diagnostic(`${nome} memória (MiB): remetente ${JSON.stringify(descreverMemoriaEmMiB(memoria.remetente))}, destinatário ${JSON.stringify(descreverMemoriaEmMiB(memoria.destinatario))}`);
 
         assert.match(estadoDoEnvio, /^concluído/, estadoDoEnvio);
         assert.equal(recebido.nome, nome);
         assert.equal(recebido.tamanho, statSync(caminho).size);
         assert.equal(recebido.sha256, hashes[nome], 'o SHA-256 recebido deveria ser igual ao de referência do P0');
+
+        // Critério da Etapa 1: memória do remetente estável, sem crescer na proporção do arquivo.
+        // Margem: limiar alto do buffer (1 MiB) + leitura (1 MiB) + folga do navegador, bem abaixo do tamanho do arquivo.
+        const crescimentoDoRemetente = memoria.remetente.maximaBytes - memoria.remetente.inicialBytes;
+        assert.ok(crescimentoDoRemetente < 32 * 1024 * 1024, `remetente cresceu ${emMiB(crescimentoDoRemetente)} MiB`);
       });
     }
   });

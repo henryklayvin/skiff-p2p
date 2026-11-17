@@ -15,6 +15,7 @@ import { formatarBytes, formatarMs } from './metricas.js';
 import { PARAMETROS_PADRAO, UNIDADES } from './parametros.js';
 import { enviarArquivo } from './envio.js';
 import { criarRecebedor } from './recebimento.js';
+import { criarAmostradorDeMemoria } from './memoria.js';
 
 const elemento = (id) => document.getElementById(id);
 
@@ -239,13 +240,51 @@ elemento('botao-enviar-mensagem').addEventListener('click', () => executar(async
 const porcentagem = (parte, total) => (total > 0 ? `${((parte / total) * 100).toFixed(1)}%` : '100%');
 const descreverVazao = (duracaoMs, vazaoMiBs) => `${(duracaoMs / 1000).toFixed(2)} s / ${vazaoMiBs.toFixed(1)} MiB/s`;
 let urlDoUltimoArquivo = null;
+window.ultimaMemoria = { envio: null, recebimento: null }; // lido pelos testes automáticos
+
+function descreverMemoria(resumo) {
+  if (!resumo) {
+    return 'indisponível neste navegador';
+  }
+  return `${formatarBytes(resumo.inicialBytes)} / ${formatarBytes(resumo.maximaBytes)} / ${formatarBytes(resumo.finalBytes)} (${resumo.amostras} amostras)`;
+}
+
+async function encerrarAmostragem(amostrador, lado) {
+  const resumo = await amostrador.parar();
+  window.ultimaMemoria[lado] = resumo;
+  elemento(`${lado}-memoria`).textContent = descreverMemoria(resumo);
+  if (resumo) {
+    registrar(`Memória da aba (${lado}): inicial ${formatarBytes(resumo.inicialBytes)}, máxima ${formatarBytes(resumo.maximaBytes)}, final ${formatarBytes(resumo.finalBytes)}`);
+  }
+}
 
 function prepararRecebimento() {
+  let progressoDoRecebimento = 0;
+  let amostrador = null;
+  const iniciarAmostragem = () => {
+    if (!amostrador) {
+      progressoDoRecebimento = 0;
+      amostrador = criarAmostradorDeMemoria(() => progressoDoRecebimento);
+      elemento('recebimento-memoria').textContent = amostrador.disponivel ? 'medindo...' : 'indisponível neste navegador';
+      window.ultimaMemoria.recebimento = null;
+      amostrador.iniciar();
+    }
+  };
+  const finalizarAmostragem = () => {
+    const atual = amostrador;
+    amostrador = null;
+    if (atual) {
+      encerrarAmostragem(atual, 'recebimento');
+    }
+  };
+
   criarRecebedor({
     canalDeDados: sessao.canais.dados,
     controle: sessao.controle,
     aoRegistrar: registrar,
     aoProgredir: ({ bytesRecebidos, total }) => {
+      iniciarAmostragem();
+      progressoDoRecebimento = total > 0 ? bytesRecebidos / total : 1;
       elemento('recebimento-estado').textContent = 'recebendo';
       elemento('progresso-recebimento').value = total > 0 ? bytesRecebidos / total : 1;
       elemento('recebimento-bytes').textContent = `${formatarBytes(bytesRecebidos)} de ${formatarBytes(total)} (${porcentagem(bytesRecebidos, total)})`;
@@ -267,10 +306,12 @@ function prepararRecebimento() {
       link.textContent = `Baixar ${resultado.nomeSeguro} (${formatarBytes(resultado.bytesRecebidos)})`;
       link.hidden = false;
       registrar(`Arquivo recebido: ${formatarBytes(resultado.bytesRecebidos)}, ${descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs)}, destino ${resultado.destino}`);
+      finalizarAmostragem();
     },
     aoFalhar: (erro) => {
       elemento('recebimento-estado').textContent = `falhou: ${erro.message}`;
       registrar(`Recebimento falhou: ${erro.message}`);
+      finalizarAmostragem();
     },
   });
 }
@@ -294,6 +335,11 @@ elemento('botao-enviar-arquivo').addEventListener('click', () => executar(async 
   elemento('envio-estado').textContent = 'aguardando aceite';
   elemento('progresso-envio').value = 0;
   registrar(`Enviando ${formatarBytes(arquivo.size)} (limiares do buffer: ${formatarBytes(parametros.limiarAltoDoBuffer)} / ${formatarBytes(parametros.limiarBaixoDoBuffer)})`);
+  let progressoDoEnvio = 0;
+  const amostrador = criarAmostradorDeMemoria(() => progressoDoEnvio);
+  window.ultimaMemoria.envio = null;
+  elemento('envio-memoria').textContent = amostrador.disponivel ? 'medindo...' : 'indisponível neste navegador';
+  amostrador.iniciar();
   try {
     const resultado = await enviarArquivo({
       arquivo,
@@ -302,6 +348,7 @@ elemento('botao-enviar-arquivo').addEventListener('click', () => executar(async 
       parametros,
       aoRegistrar: registrar,
       aoProgredir: ({ bytesEnviados, total, bufferAtual, maiorBufferObservado }) => {
+        progressoDoEnvio = total > 0 ? bytesEnviados / total : 1;
         elemento('envio-estado').textContent = 'enviando';
         elemento('progresso-envio').value = total > 0 ? bytesEnviados / total : 1;
         elemento('envio-bytes').textContent = `${formatarBytes(bytesEnviados)} de ${formatarBytes(total)} (${porcentagem(bytesEnviados, total)})`;
@@ -320,6 +367,7 @@ elemento('botao-enviar-arquivo').addEventListener('click', () => executar(async 
     throw erro;
   } finally {
     elemento('botao-enviar-arquivo').disabled = sessao.canais.dados.readyState !== 'open';
+    encerrarAmostragem(amostrador, 'envio');
   }
 }, 'enviar o arquivo'));
 

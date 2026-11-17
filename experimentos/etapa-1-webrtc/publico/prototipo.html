@@ -110,6 +110,7 @@
     <section aria-labelledby="titulo-transferencia">
       <h2 id="titulo-transferencia">7. Transferência de arquivo</h2>
       <p class="dica">Blocos de 16 KiB (cabeçalho incluso). O destinatário aceita automaticamente: o consentimento por arquivo é do produto, não deste experimento. O arquivo recebido é sempre oferecido para download, nunca aberto.</p>
+      <p class="dica">Memória: medida pela própria aba (Chromium). Inclui JavaScript e buffers da página; não inclui o conteúdo de Blobs, que fica no processo principal do navegador. Cada medição pode levar alguns segundos.</p>
       <label for="arquivo-para-enviar">Arquivo</label>
       <input type="file" id="arquivo-para-enviar">
       <div class="botoes">
@@ -129,6 +130,7 @@
           <tr><th scope="row">Buffer atual / maior</th><td id="envio-buffer">—</td></tr>
           <tr><th scope="row">Pausas por buffer cheio</th><td id="envio-pausas">—</td></tr>
           <tr><th scope="row">Duração / vazão</th><td id="envio-vazao">—</td></tr>
+          <tr><th scope="row">Memória desta aba (inicial / máxima / final)</th><td id="envio-memoria">—</td></tr>
         </tbody>
       </table>
 
@@ -139,6 +141,7 @@
           <tr><th scope="row">Estado</th><td id="recebimento-estado">—</td></tr>
           <tr><th scope="row">Recebidos</th><td id="recebimento-bytes">—</td></tr>
           <tr><th scope="row">Duração / vazão</th><td id="recebimento-vazao">—</td></tr>
+          <tr><th scope="row">Memória desta aba (inicial / máxima / final)</th><td id="recebimento-memoria">—</td></tr>
           <tr><th scope="row">Arquivo</th><td><a id="link-download" hidden>Baixar</a></td></tr>
         </tbody>
       </table>
