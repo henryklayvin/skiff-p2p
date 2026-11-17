@@ -24,8 +24,8 @@ Configuração ICE em todos os testes: `stun:stun.l.google.com:19302`.
    - Com a sinalização por WebSocket, essa troca leva milissegundos.
 
 3. **Interrupção curta entre PC-1 e IOS-1:** `disconnected` seguido de `connected` em cerca de 5 s, sem ação do usuário.
-   - Possível causa: economia de energia do Wi-Fi no iPhone ou tela bloqueando.
-   - A observar nos testes de transferência da Fase D.
+   - Causa provável, segundo o desenvolvedor: a saída do Safari para copiar e colar os textos em outro aplicativo. Ao sair do navegador, o iOS suspende a página.
+   - É coerente com a limitação de segundo plano já documentada. Será observada nos testes de transferência da Fase D.
 
 4. **O emulador não conecta ao PC-1 por conexão direta. Causa provável: mDNS.**
    - Por privacidade, o Chrome não publica o IP local no SDP: troca-o por um nome temporário do tipo `xxxx.local` (mDNS), que só pode ser resolvido na mesma rede local física.
