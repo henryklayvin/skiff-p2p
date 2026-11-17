@@ -12,7 +12,8 @@
 | P1 | Servidor HTTPS estático e página de diagnóstico | Concluído: PC, iPhone e emulador Android abrem sem alerta |
 | P2 | Conexão WebRTC por troca manual de SDP | Concluído: duas abas e PC ↔ iPhone conectados; PC ↔ emulador falhou (ver `resultados.md`) |
 | P3 | Latência do canal `controle` com o canal ocioso | Concluído: mediana de cerca de 5 ms entre PC e iPhone (ver `resultados.md`) |
-| P4 a P11 | Transferência, coturn, testes e relatório | Pendentes |
+| P4 | Envio em blocos de 16 KiB com controle de fluxo local; destino em Blob | Implementado e testado automaticamente (10 MiB e 100 MiB íntegros); validação manual pendente |
+| P5 a P11 | Confirmações, hash, cancelamento, destinos, coturn, testes e relatório | Pendentes |
 
 ## Arquivos deste diretório
 
@@ -35,6 +36,13 @@
 | `publico/js/latencia.js` | Medição de latência do `controle` por sondas (`sonda` / `resposta-sonda`) |
 | `publico/js/metricas.js` | Funções puras de métricas (percentis, resumo, formatação) |
 | `metricas.test.mjs` | Testes unitários das métricas, executados no Node |
+| `publico/js/parametros.js` | **Parâmetros experimentais centralizados**: bloco, leitura, limiares do buffer |
+| `publico/js/protocolo-de-dados.js` | Formato binário dos blocos (cabeçalho de 16 bytes, versão 1) |
+| `publico/js/envio.js` | Oferta, aceite, leitura em partes, envio em blocos e controle de fluxo por `bufferedAmount` |
+| `publico/js/recebimento.js` | Validação da oferta e dos blocos (ordem, tamanho), aceite automático, gravação no destino |
+| `publico/js/destinos.js` | Destino dos arquivos recebidos (P4: Blob) |
+| `publico/js/nomes.js` | Sanitização de nomes de arquivos recebidos |
+| `transferencia.test.mjs` | Testes unitários do formato dos blocos, dos nomes e da formatação |
 
 ## Executar o servidor
 

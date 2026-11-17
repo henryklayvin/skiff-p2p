@@ -11,7 +11,10 @@ import {
 import { classificarCaminho, obterParSelecionado } from './estatisticas.js';
 import { criarCanalDeControle } from './controle.js';
 import { criarMedidorDeLatencia } from './latencia.js';
-import { formatarMs } from './metricas.js';
+import { formatarBytes, formatarMs } from './metricas.js';
+import { PARAMETROS_PADRAO, UNIDADES } from './parametros.js';
+import { enviarArquivo } from './envio.js';
+import { criarRecebedor } from './recebimento.js';
 
 const elemento = (id) => document.getElementById(id);
 
@@ -106,6 +109,9 @@ function iniciarSessao() {
         elemento('botao-atualizar-par').disabled = false;
         elemento('botao-medir-latencia').disabled = false;
       }
+      if (nome === 'dados') {
+        elemento('botao-enviar-arquivo').disabled = false;
+      }
     });
     canal.addEventListener('close', () => {
       exibirEstadoDoCanal(nome, canal);
@@ -120,6 +126,7 @@ function iniciarSessao() {
       registrar(`Recebido no "controle": "${mensagem.texto.slice(0, 200)}"`);
     }
   });
+  prepararRecebimento();
 
   registrar(`Conexão criada com ${configuracao.iceServers?.length ?? 0} servidor(es) ICE`);
   return sessao;
@@ -226,6 +233,95 @@ elemento('botao-enviar-mensagem').addEventListener('click', () => executar(async
   sessao.controle.enviar({ tipo: 'mensagem-de-teste', texto });
   registrar(`Enviado no "controle": "${texto}"`);
 }, 'enviar a mensagem'));
+
+// ---------- transferência de arquivo (P4) ----------
+
+const porcentagem = (parte, total) => (total > 0 ? `${((parte / total) * 100).toFixed(1)}%` : '100%');
+const descreverVazao = (duracaoMs, vazaoMiBs) => `${(duracaoMs / 1000).toFixed(2)} s / ${vazaoMiBs.toFixed(1)} MiB/s`;
+let urlDoUltimoArquivo = null;
+
+function prepararRecebimento() {
+  criarRecebedor({
+    canalDeDados: sessao.canais.dados,
+    controle: sessao.controle,
+    aoRegistrar: registrar,
+    aoProgredir: ({ bytesRecebidos, total }) => {
+      elemento('recebimento-estado').textContent = 'recebendo';
+      elemento('progresso-recebimento').value = total > 0 ? bytesRecebidos / total : 1;
+      elemento('recebimento-bytes').textContent = `${formatarBytes(bytesRecebidos)} de ${formatarBytes(total)} (${porcentagem(bytesRecebidos, total)})`;
+    },
+    aoConcluir: (resultado) => {
+      elemento('recebimento-estado').textContent = 'concluído';
+      elemento('progresso-recebimento').value = 1;
+      elemento('recebimento-bytes').textContent = `${formatarBytes(resultado.bytesRecebidos)} em ${resultado.blocos} blocos`;
+      elemento('recebimento-vazao').textContent = descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs);
+      if (urlDoUltimoArquivo) {
+        URL.revokeObjectURL(urlDoUltimoArquivo);
+      }
+      urlDoUltimoArquivo = URL.createObjectURL(resultado.blob);
+      // Acesso para os testes automáticos conferirem o conteúdo (a CSP não permite fetch de blob:).
+      window.ultimoArquivoRecebido = { blob: resultado.blob, nome: resultado.nomeSeguro };
+      const link = elemento('link-download');
+      link.href = urlDoUltimoArquivo;
+      link.download = resultado.nomeSeguro;
+      link.textContent = `Baixar ${resultado.nomeSeguro} (${formatarBytes(resultado.bytesRecebidos)})`;
+      link.hidden = false;
+      registrar(`Arquivo recebido: ${formatarBytes(resultado.bytesRecebidos)}, ${descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs)}, destino ${resultado.destino}`);
+    },
+    aoFalhar: (erro) => {
+      elemento('recebimento-estado').textContent = `falhou: ${erro.message}`;
+      registrar(`Recebimento falhou: ${erro.message}`);
+    },
+  });
+}
+
+function lerParametrosDeEnvio() {
+  const limiarAltoDoBuffer = lerInteiro('limiar-alto', 16, 16 * 1024) * UNIDADES.KiB;
+  const limiarBaixoDoBuffer = lerInteiro('limiar-baixo', 0, 16_000) * UNIDADES.KiB;
+  if (limiarBaixoDoBuffer >= limiarAltoDoBuffer) {
+    throw new Error('O limiar baixo deve ser menor que o limiar alto.');
+  }
+  return { ...PARAMETROS_PADRAO, limiarAltoDoBuffer, limiarBaixoDoBuffer };
+}
+
+elemento('botao-enviar-arquivo').addEventListener('click', () => executar(async () => {
+  const arquivo = elemento('arquivo-para-enviar').files?.[0];
+  if (!arquivo) {
+    throw new Error('Escolha um arquivo.');
+  }
+  const parametros = lerParametrosDeEnvio();
+  elemento('botao-enviar-arquivo').disabled = true;
+  elemento('envio-estado').textContent = 'aguardando aceite';
+  elemento('progresso-envio').value = 0;
+  registrar(`Enviando ${formatarBytes(arquivo.size)} (limiares do buffer: ${formatarBytes(parametros.limiarAltoDoBuffer)} / ${formatarBytes(parametros.limiarBaixoDoBuffer)})`);
+  try {
+    const resultado = await enviarArquivo({
+      arquivo,
+      canalDeDados: sessao.canais.dados,
+      controle: sessao.controle,
+      parametros,
+      aoRegistrar: registrar,
+      aoProgredir: ({ bytesEnviados, total, bufferAtual, maiorBufferObservado }) => {
+        elemento('envio-estado').textContent = 'enviando';
+        elemento('progresso-envio').value = total > 0 ? bytesEnviados / total : 1;
+        elemento('envio-bytes').textContent = `${formatarBytes(bytesEnviados)} de ${formatarBytes(total)} (${porcentagem(bytesEnviados, total)})`;
+        elemento('envio-buffer').textContent = `${formatarBytes(bufferAtual)} / ${formatarBytes(maiorBufferObservado)}`;
+      },
+    });
+    // Acesso para os testes automáticos coletarem as métricas completas do envio.
+    window.ultimoEnvio = resultado;
+    elemento('envio-estado').textContent = 'concluído (destinatário confirmou o recebimento)';
+    elemento('envio-buffer').textContent = `maior: ${formatarBytes(resultado.maiorBufferObservado)}`;
+    elemento('envio-pausas').textContent = String(resultado.pausasPorBufferCheio);
+    elemento('envio-vazao').textContent = descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs);
+    registrar(`Envio concluído: ${resultado.blocos} blocos, ${descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs)}, maior buffer ${formatarBytes(resultado.maiorBufferObservado)}, ${resultado.pausasPorBufferCheio} pausas`);
+  } catch (erro) {
+    elemento('envio-estado').textContent = `falhou: ${erro.message}`;
+    throw erro;
+  } finally {
+    elemento('botao-enviar-arquivo').disabled = sessao.canais.dados.readyState !== 'open';
+  }
+}, 'enviar o arquivo'));
 
 function lerInteiro(id, minimo, maximo) {
   const valor = Number.parseInt(elemento(id).value, 10);

@@ -107,6 +107,43 @@
       </table>
     </section>
 
+    <section aria-labelledby="titulo-transferencia">
+      <h2 id="titulo-transferencia">7. Transferência de arquivo</h2>
+      <p class="dica">Blocos de 16 KiB (cabeçalho incluso). O destinatário aceita automaticamente: o consentimento por arquivo é do produto, não deste experimento. O arquivo recebido é sempre oferecido para download, nunca aberto.</p>
+      <label for="arquivo-para-enviar">Arquivo</label>
+      <input type="file" id="arquivo-para-enviar">
+      <div class="botoes">
+        <label for="limiar-alto">Limiar alto do buffer (KiB)</label>
+        <input type="number" id="limiar-alto" min="16" max="16384" value="1024">
+        <label for="limiar-baixo">Limiar baixo (KiB)</label>
+        <input type="number" id="limiar-baixo" min="0" max="16000" value="256">
+      </div>
+      <button type="button" id="botao-enviar-arquivo" disabled>Enviar arquivo</button>
+
+      <h3>Envio</h3>
+      <progress id="progresso-envio" max="1" value="0"></progress>
+      <table>
+        <tbody>
+          <tr><th scope="row">Estado</th><td id="envio-estado">—</td></tr>
+          <tr><th scope="row">Entregues ao send()</th><td id="envio-bytes">—</td></tr>
+          <tr><th scope="row">Buffer atual / maior</th><td id="envio-buffer">—</td></tr>
+          <tr><th scope="row">Pausas por buffer cheio</th><td id="envio-pausas">—</td></tr>
+          <tr><th scope="row">Duração / vazão</th><td id="envio-vazao">—</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Recebimento</h3>
+      <progress id="progresso-recebimento" max="1" value="0"></progress>
+      <table>
+        <tbody>
+          <tr><th scope="row">Estado</th><td id="recebimento-estado">—</td></tr>
+          <tr><th scope="row">Recebidos</th><td id="recebimento-bytes">—</td></tr>
+          <tr><th scope="row">Duração / vazão</th><td id="recebimento-vazao">—</td></tr>
+          <tr><th scope="row">Arquivo</th><td><a id="link-download" hidden>Baixar</a></td></tr>
+        </tbody>
+      </table>
+    </section>
+
     <section aria-labelledby="titulo-registro">
       <h2 id="titulo-registro">Registro de eventos</h2>
       <ol id="registro" class="registro"></ol>

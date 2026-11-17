@@ -30,6 +30,21 @@ export function resumirAmostras(amostras) {
   };
 }
 
+/** Formata uma quantidade de bytes em B, KiB, MiB ou GiB, com uma casa decimal. */
+export function formatarBytes(bytes) {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes)) {
+    return '—';
+  }
+  const unidades = ['B', 'KiB', 'MiB', 'GiB'];
+  let valor = bytes;
+  let indice = 0;
+  while (Math.abs(valor) >= 1024 && indice < unidades.length - 1) {
+    valor /= 1024;
+    indice++;
+  }
+  return indice === 0 ? `${valor} B` : `${valor.toFixed(1)} ${unidades[indice]}`;
+}
+
 /** Formata um valor em milissegundos com uma casa decimal, ou "—" se ausente. */
 export function formatarMs(valor) {
   return typeof valor === 'number' && Number.isFinite(valor) ? `${valor.toFixed(1)} ms` : '—';

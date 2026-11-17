@@ -48,6 +48,34 @@ Configuração ICE em todos os testes: `stun:stun.l.google.com:19302`.
 
 **Leitura:** são as referências de latência **sem carga** no canal `dados`. Entre PC e iPhone, a mediana fica em cerca de 5 ms, com picos de até cerca de 12 ms. Elas serão comparadas com a latência medida durante transferências, que é o que importa para cancelamentos e confirmações.
 
+## P4 — Blocos de 16 KiB e controle de fluxo local (2026-11-17)
+
+**Implementação:**
+- Blocos de 16 KiB no total: cabeçalho de 16 bytes e 16.368 bytes de conteúdo.
+- Leitura do arquivo em partes de 1 MiB.
+- Controle de fluxo local: pausa acima de 1 MiB em `bufferedAmount`; retomada no evento `bufferedamountlow`, configurado em 256 KiB.
+- A oferta e o aceite acontecem no canal `controle` **antes** do primeiro bloco, porque não há ordem garantida entre `controle` e `dados`.
+- Destino: Blob.
+
+**Testes automáticos** (Chrome 157 headless, duas abas no PC-1, conexão direta):
+
+| Transferência na mesma conexão | Arquivo | Duração | Vazão | Maior `bufferedAmount` | Pausas | SHA-256 |
+|---|---|---|---|---|---|---|
+| 1ª | 10 MiB | 3,54 s | 2,8 MiB/s | 1,0 MiB | 11 | ✅ idêntico |
+| 2ª | 10 MiB | 0,71 s | 14,2 MiB/s | 1,0 MiB | 11 | ✅ idêntico |
+| 3ª | 100 MiB | 7,48 s | 13,4 MiB/s | 1,0 MiB | 120 | ✅ idêntico |
+| 4ª | 10 MiB | 0,70 s | 14,3 MiB/s | 1,0 MiB | 11 | ✅ idêntico |
+
+Nos testes, o SHA-256 é calculado sobre o arquivo inteiro já recebido, só para conferir. Não é a estratégia de hash do experimento, que é incremental e entra no P6.
+
+**Constatações:**
+1. **Integridade:** os arquivos de 10 MiB e 100 MiB chegaram idênticos ao original.
+2. **O controle de fluxo funciona:** o buffer nunca passou do limiar alto e não houve erro nem fechamento de canal.
+3. **A primeira transferência de cada conexão é bem mais lenta** (cerca de 3,5 s a mais).
+   - A leitura do disco não explica: o arquivo de 100 MiB, lido pela primeira vez, teve a vazão normal.
+   - Hipótese: aquecimento da conexão, como a janela de congestionamento do SCTP crescendo ou a otimização do JavaScript pelo navegador. A confirmar nos testes manuais.
+4. **Vazão estável de cerca de 14 MiB/s** na mesma máquina, com limiares de 1 MiB / 256 KiB. Limiares maiores podem aumentar a vazão; isso será calibrado nos testes manuais.
+
 ### Pendências
 
 - Confirmar a causa do item 4, desativando temporariamente a ocultação do IP local no Chrome do PC-1 (teste opcional) ou validando a conexão via TURN no P10.
