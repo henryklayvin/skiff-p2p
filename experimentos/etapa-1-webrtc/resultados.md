@@ -97,6 +97,36 @@ Nos testes, o SHA-256 é calculado sobre o arquivo inteiro já recebido, só par
 - A medição manual de memória pelo Gerenciador de Tarefas do Windows não foi possível, porque ele agrupa todos os processos do Chrome. Foi substituída pela medição da própria aba, acima.
 - **PC-1 → IOS-1 foi mais rápido que entre duas abas do mesmo PC.** Hipótese: nas duas abas, remetente e destinatário disputam o mesmo processador, e o emulador Android também estava em execução.
 
+## P5 — Confirmações (ACK) e janela ponta a ponta (2026-11-17)
+
+**Implementação:**
+- O destinatário confirma os bytes **gravados** a cada 1 MiB ou a cada 250 ms. Um temporizador garante a confirmação mesmo quando param de chegar blocos.
+- O remetente nunca deixa mais de 8 MiB enviados e não confirmados.
+- Sem avanço das confirmações por 15 s, a transferência falha.
+- O progresso do remetente passou a usar os bytes **confirmados**.
+- Os intervalos de confirmação vão na oferta, para os dois lados usarem a mesma configuração.
+
+**Testes automáticos** (Chrome 157 headless, duas abas no PC-1):
+
+| Teste | Duração | Vazão | Maior janela | Maior buffer | Pausas (buffer / janela) | Confirmações | SHA-256 |
+|---|---|---|---|---|---|---|---|
+| 10 MiB, 1ª transferência da conexão | 21,4 s | 0,5 MiB/s | 4,8 MiB | 1,0 MiB | 12 / 0 | 52 | ✅ |
+| 100 MiB | 5,5 s | 18,1 MiB/s | 2,4 MiB | 1,0 MiB | 121 / 0 | 100 | ✅ |
+| 50 MiB, destinatário lento (100 ms por MiB) | 5,5 s | 9,1 MiB/s | **8,0 MiB** | 1,0 MiB | 17 / **36** | 50 | ✅ |
+
+- **A janela funciona:** com o destinatário lento, ela limitou o envio (36 pausas) e nunca passou de 8 MiB. A memória da aba do destinatário ficou em no máximo 12,2 MiB. Sem a janela, os blocos se acumulariam na memória do destinatário à espera da gravação.
+- **Custo das confirmações:** cerca de 1 mensagem por MiB (100 confirmações em 100 MiB), desprezível diante dos dados.
+- **Latência do `controle` durante a transferência de 100 MiB:** mediana de **15,4 ms**, p95 de 19,5 ms e máximo de 22,0 ms, contra 0,6 ms com o canal ocioso na mesma máquina. Esse é o atraso esperado para cancelamentos e confirmações com o canal `dados` carregado.
+
+**Constatação: a primeira transferência de cada conexão trava na mesma máquina.**
+- O travamento aparece com e sem a medição de memória: 18,6 s e 20,4 s para 10 MiB; as transferências seguintes levam cerca de 0,5 s (cerca de 21 MiB/s).
+- A leitura do arquivo não é a causa: cerca de 2 ms por MiB, mesmo na primeira leitura.
+- Rastreamento: cerca de 1,5 MiB passam em 0,5 s; depois os dados chegam a cerca de 70 KiB/s durante 18 s; em seguida, tudo flui em velocidade total.
+- Limiares menores (256/64 e 128/32 KiB) não resolveram de forma consistente: de 6 s a 20 s.
+- **Não observado no PC-1 → IOS-1 pelo Wi-Fi** (50 MiB em 1,77 s, no P4).
+- **Hipótese:** perda de pacotes UDP no início da associação SCTP quando os dois lados estão na mesma máquina, com recuperação lenta por retransmissões. A confirmar em rede real nos testes manuais.
+- **Consequência para os testes automáticos:** a vazão da primeira transferência na mesma máquina não é representativa. Medições de vazão devem considerar uma transferência de aquecimento.
+
 ### Pendências
 
 - Confirmar a causa do item 4, desativando temporariamente a ocultação do IP local no Chrome do PC-1 (teste opcional) ou validando a conexão via TURN no P10.

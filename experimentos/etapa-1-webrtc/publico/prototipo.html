@@ -119,16 +119,34 @@
         <label for="limiar-baixo">Limiar baixo (KiB)</label>
         <input type="number" id="limiar-baixo" min="0" max="16000" value="256">
       </div>
+      <div class="botoes">
+        <label for="janela">Janela não confirmada (KiB)</label>
+        <input type="number" id="janela" min="16" max="262144" value="8192">
+        <label for="confirmacao-bytes">Confirmar a cada (KiB)</label>
+        <input type="number" id="confirmacao-bytes" min="64" max="65536" value="1024">
+        <label for="confirmacao-ms">ou a cada (ms)</label>
+        <input type="number" id="confirmacao-ms" min="10" max="5000" value="250">
+        <label for="prazo-sem-confirmacao">Falhar sem confirmação após (s)</label>
+        <input type="number" id="prazo-sem-confirmacao" min="1" max="600" value="15">
+      </div>
+      <div class="botoes">
+        <label for="atraso-de-gravacao">Ao receber: atraso artificial de gravação (ms por MiB, só para testes)</label>
+        <input type="number" id="atraso-de-gravacao" min="0" max="10000" value="0">
+      </div>
       <button type="button" id="botao-enviar-arquivo" disabled>Enviar arquivo</button>
 
       <h3>Envio</h3>
+      <p class="dica">A barra mostra os bytes <strong>confirmados</strong> pelo destinatário, não os apenas entregues ao send().</p>
       <progress id="progresso-envio" max="1" value="0"></progress>
       <table>
         <tbody>
           <tr><th scope="row">Estado</th><td id="envio-estado">—</td></tr>
-          <tr><th scope="row">Entregues ao send()</th><td id="envio-bytes">—</td></tr>
+          <tr><th scope="row">Entregues ao send() (enviados)</th><td id="envio-bytes">—</td></tr>
+          <tr><th scope="row">Confirmados pelo destinatário</th><td id="envio-confirmados">—</td></tr>
           <tr><th scope="row">Buffer atual / maior</th><td id="envio-buffer">—</td></tr>
-          <tr><th scope="row">Pausas por buffer cheio</th><td id="envio-pausas">—</td></tr>
+          <tr><th scope="row">Janela não confirmada atual / maior</th><td id="envio-janela">—</td></tr>
+          <tr><th scope="row">Pausas por buffer / por janela</th><td id="envio-pausas">—</td></tr>
+          <tr><th scope="row">Confirmações recebidas</th><td id="envio-confirmacoes">—</td></tr>
           <tr><th scope="row">Duração / vazão</th><td id="envio-vazao">—</td></tr>
           <tr><th scope="row">Memória desta aba (inicial / máxima / final)</th><td id="envio-memoria">—</td></tr>
         </tbody>
@@ -140,6 +158,8 @@
         <tbody>
           <tr><th scope="row">Estado</th><td id="recebimento-estado">—</td></tr>
           <tr><th scope="row">Recebidos</th><td id="recebimento-bytes">—</td></tr>
+          <tr><th scope="row">Gravados e confirmados</th><td id="recebimento-confirmados">—</td></tr>
+          <tr><th scope="row">Confirmações enviadas</th><td id="recebimento-confirmacoes">—</td></tr>
           <tr><th scope="row">Duração / vazão</th><td id="recebimento-vazao">—</td></tr>
           <tr><th scope="row">Memória desta aba (inicial / máxima / final)</th><td id="recebimento-memoria">—</td></tr>
           <tr><th scope="row">Arquivo</th><td><a id="link-download" hidden>Baixar</a></td></tr>

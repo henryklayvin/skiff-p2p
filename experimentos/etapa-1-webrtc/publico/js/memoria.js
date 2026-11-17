@@ -7,7 +7,11 @@
 //   Por isso a amostragem roda em ciclo contínuo enquanto a transferência acontece.
 
 export function medicaoDeMemoriaDisponivel() {
-  return globalThis.crossOriginIsolated === true && typeof performance.measureUserAgentSpecificMemory === 'function';
+  // "?sem-memoria" na URL desliga a medição (usado para avaliar o custo da própria medição).
+  const desligadaPelaUrl = typeof location !== 'undefined' && new URLSearchParams(location.search).has('sem-memoria');
+  return !desligadaPelaUrl
+    && globalThis.crossOriginIsolated === true
+    && typeof performance.measureUserAgentSpecificMemory === 'function';
 }
 
 async function medirBytes() {

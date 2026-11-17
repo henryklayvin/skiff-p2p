@@ -16,6 +16,7 @@ import { PARAMETROS_PADRAO, UNIDADES } from './parametros.js';
 import { enviarArquivo } from './envio.js';
 import { criarRecebedor } from './recebimento.js';
 import { criarAmostradorDeMemoria } from './memoria.js';
+import { criarDestinoComAtraso, criarDestinoEmBlob } from './destinos.js';
 
 const elemento = (id) => document.getElementById(id);
 
@@ -282,17 +283,25 @@ function prepararRecebimento() {
     canalDeDados: sessao.canais.dados,
     controle: sessao.controle,
     aoRegistrar: registrar,
-    aoProgredir: ({ bytesRecebidos, total }) => {
+    criarDestino: () => {
+      const atrasoMsPorMiB = lerInteiro('atraso-de-gravacao', 0, 10_000);
+      const destino = criarDestinoEmBlob();
+      return atrasoMsPorMiB > 0 ? criarDestinoComAtraso(destino, atrasoMsPorMiB) : destino;
+    },
+    aoProgredir: ({ bytesRecebidos, bytesConfirmados, total }) => {
       iniciarAmostragem();
-      progressoDoRecebimento = total > 0 ? bytesRecebidos / total : 1;
+      progressoDoRecebimento = total > 0 ? bytesConfirmados / total : 1;
       elemento('recebimento-estado').textContent = 'recebendo';
-      elemento('progresso-recebimento').value = total > 0 ? bytesRecebidos / total : 1;
+      elemento('progresso-recebimento').value = progressoDoRecebimento;
       elemento('recebimento-bytes').textContent = `${formatarBytes(bytesRecebidos)} de ${formatarBytes(total)} (${porcentagem(bytesRecebidos, total)})`;
+      elemento('recebimento-confirmados').textContent = `${formatarBytes(bytesConfirmados)} (${porcentagem(bytesConfirmados, total)})`;
     },
     aoConcluir: (resultado) => {
       elemento('recebimento-estado').textContent = 'concluído';
       elemento('progresso-recebimento').value = 1;
       elemento('recebimento-bytes').textContent = `${formatarBytes(resultado.bytesRecebidos)} em ${resultado.blocos} blocos`;
+      elemento('recebimento-confirmados').textContent = formatarBytes(resultado.bytesRecebidos);
+      elemento('recebimento-confirmacoes').textContent = String(resultado.confirmacoesEnviadas);
       elemento('recebimento-vazao').textContent = descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs);
       if (urlDoUltimoArquivo) {
         URL.revokeObjectURL(urlDoUltimoArquivo);
@@ -322,7 +331,15 @@ function lerParametrosDeEnvio() {
   if (limiarBaixoDoBuffer >= limiarAltoDoBuffer) {
     throw new Error('O limiar baixo deve ser menor que o limiar alto.');
   }
-  return { ...PARAMETROS_PADRAO, limiarAltoDoBuffer, limiarBaixoDoBuffer };
+  return {
+    ...PARAMETROS_PADRAO,
+    limiarAltoDoBuffer,
+    limiarBaixoDoBuffer,
+    janelaDeBytesNaoConfirmados: lerInteiro('janela', 16, 262_144) * UNIDADES.KiB,
+    intervaloDeConfirmacaoBytes: lerInteiro('confirmacao-bytes', 64, 65_536) * UNIDADES.KiB,
+    intervaloDeConfirmacaoMs: lerInteiro('confirmacao-ms', 10, 5_000),
+    prazoSemConfirmacaoMs: lerInteiro('prazo-sem-confirmacao', 1, 600) * 1000,
+  };
 }
 
 elemento('botao-enviar-arquivo').addEventListener('click', () => executar(async () => {
@@ -347,21 +364,27 @@ elemento('botao-enviar-arquivo').addEventListener('click', () => executar(async 
       controle: sessao.controle,
       parametros,
       aoRegistrar: registrar,
-      aoProgredir: ({ bytesEnviados, total, bufferAtual, maiorBufferObservado }) => {
-        progressoDoEnvio = total > 0 ? bytesEnviados / total : 1;
+      aoProgredir: ({ bytesEnviados, bytesConfirmados, total, bufferAtual, maiorBufferObservado, janelaAtual, maiorJanelaObservada }) => {
+        progressoDoEnvio = total > 0 ? bytesConfirmados / total : 1;
         elemento('envio-estado').textContent = 'enviando';
-        elemento('progresso-envio').value = total > 0 ? bytesEnviados / total : 1;
+        elemento('progresso-envio').value = progressoDoEnvio;
         elemento('envio-bytes').textContent = `${formatarBytes(bytesEnviados)} de ${formatarBytes(total)} (${porcentagem(bytesEnviados, total)})`;
+        elemento('envio-confirmados').textContent = `${formatarBytes(bytesConfirmados)} (${porcentagem(bytesConfirmados, total)})`;
         elemento('envio-buffer').textContent = `${formatarBytes(bufferAtual)} / ${formatarBytes(maiorBufferObservado)}`;
+        elemento('envio-janela').textContent = `${formatarBytes(janelaAtual)} / ${formatarBytes(maiorJanelaObservada)}`;
       },
     });
+    elemento('progresso-envio').value = 1;
+    elemento('envio-confirmados').textContent = `${formatarBytes(resultado.bytesConfirmados)} (100.0%)`;
+    elemento('envio-janela').textContent = `maior: ${formatarBytes(resultado.maiorJanelaObservada)}`;
+    elemento('envio-confirmacoes').textContent = String(resultado.confirmacoesRecebidas);
     // Acesso para os testes automáticos coletarem as métricas completas do envio.
     window.ultimoEnvio = resultado;
     elemento('envio-estado').textContent = 'concluído (destinatário confirmou o recebimento)';
     elemento('envio-buffer').textContent = `maior: ${formatarBytes(resultado.maiorBufferObservado)}`;
-    elemento('envio-pausas').textContent = String(resultado.pausasPorBufferCheio);
+    elemento('envio-pausas').textContent = `${resultado.pausasPorBufferCheio} / ${resultado.pausasPorJanelaCheia}`;
     elemento('envio-vazao').textContent = descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs);
-    registrar(`Envio concluído: ${resultado.blocos} blocos, ${descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs)}, maior buffer ${formatarBytes(resultado.maiorBufferObservado)}, ${resultado.pausasPorBufferCheio} pausas`);
+    registrar(`Envio concluído: ${resultado.blocos} blocos, ${descreverVazao(resultado.duracaoMs, resultado.vazaoMiBs)}, maior buffer ${formatarBytes(resultado.maiorBufferObservado)}, maior janela ${formatarBytes(resultado.maiorJanelaObservada)}, pausas ${resultado.pausasPorBufferCheio}/${resultado.pausasPorJanelaCheia}, ${resultado.confirmacoesRecebidas} confirmações`);
   } catch (erro) {
     elemento('envio-estado').textContent = `falhou: ${erro.message}`;
     throw erro;

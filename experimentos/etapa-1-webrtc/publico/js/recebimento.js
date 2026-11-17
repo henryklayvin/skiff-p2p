@@ -1,13 +1,23 @@
-// Recebimento de arquivos (P4).
+// Recebimento de arquivos.
+//
+// P4: validação da oferta e dos blocos (ordem e tamanho) e gravação no destino.
+// P5: confirmações (ACK) dos bytes efetivamente gravados.
 //
 // No experimento o aceite é AUTOMÁTICO: o consentimento por arquivo é um requisito do
 // produto (ADR 0008), mas não é objeto deste experimento técnico.
+//
+// Contadores:
+//   bytesRecebidos   chegaram pelo canal "dados", em ordem
+//   bytesConfirmados recebidos em ordem E gravados no destino (os que são confirmados ao remetente)
 
 import { criarDestinoEmBlob } from './destinos.js';
+import { LIMITES_DE_CONFIRMACAO, PARAMETROS_PADRAO } from './parametros.js';
 import { lerBloco } from './protocolo-de-dados.js';
 import { sanitizarNomeDeArquivo } from './nomes.js';
 
 const TAMANHO_MAXIMO_DO_NOME_RECEBIDO = 1024;
+
+const dentroDe = (valor, minimo, maximo) => Number.isSafeInteger(valor) && valor >= minimo && valor <= maximo;
 
 function validarOferta(mensagem) {
   const arquivo = mensagem.arquivos?.[0];
@@ -17,6 +27,18 @@ function validarOferta(mensagem) {
     && typeof arquivo.nome === 'string' && arquivo.nome.length <= TAMANHO_MAXIMO_DO_NOME_RECEBIDO
     && Number.isSafeInteger(arquivo.tamanho) && arquivo.tamanho >= 0;
   return valida ? arquivo : null;
+}
+
+/** Usa os intervalos de confirmação pedidos na oferta, se estiverem dentro dos limites; senão, os padrões. */
+function lerIntervalosDeConfirmacao(mensagem) {
+  const pedido = mensagem.confirmacao ?? {};
+  const { bytesMinimo, bytesMaximo, msMinimo, msMaximo } = LIMITES_DE_CONFIRMACAO;
+  return {
+    intervaloBytes: dentroDe(pedido.intervaloBytes, bytesMinimo, bytesMaximo)
+      ? pedido.intervaloBytes : PARAMETROS_PADRAO.intervaloDeConfirmacaoBytes,
+    intervaloMs: dentroDe(pedido.intervaloMs, msMinimo, msMaximo)
+      ? pedido.intervaloMs : PARAMETROS_PADRAO.intervaloDeConfirmacaoMs,
+  };
 }
 
 /**
@@ -38,44 +60,76 @@ export function criarRecebedor({
   let blocosDescartados = 0;
   let ultimoProgresso = 0;
 
-  const informarProgresso = (forcar = false) => {
+  const informarProgresso = (transferencia, forcar = false) => {
     const agora = performance.now();
-    if (atual && (forcar || agora - ultimoProgresso >= 100)) {
+    if (forcar || agora - ultimoProgresso >= 100) {
       ultimoProgresso = agora;
-      aoProgredir({ bytesRecebidos: atual.bytesRecebidos, total: atual.arquivo.tamanho, decorridoMs: agora - atual.inicio });
+      aoProgredir({
+        bytesRecebidos: transferencia.bytesRecebidos,
+        bytesConfirmados: transferencia.bytesConfirmados,
+        total: transferencia.arquivo.tamanho,
+        decorridoMs: agora - transferencia.inicio,
+      });
     }
   };
 
-  async function falhar(motivo) {
-    const transferencia = atual;
-    atual = null;
-    if (!transferencia) {
+  /** Envia "confirmacao" se houver bytes novos e o intervalo (em bytes ou em tempo) tiver sido atingido. */
+  function confirmarSeNecessario(transferencia, forcar = false) {
+    const novos = transferencia.bytesConfirmados - transferencia.ultimoValorConfirmado;
+    if (novos <= 0) {
       return;
     }
+    const tempoDesdeAUltima = performance.now() - transferencia.ultimaConfirmacaoEm;
+    if (forcar || novos >= transferencia.confirmacao.intervaloBytes || tempoDesdeAUltima >= transferencia.confirmacao.intervaloMs) {
+      controle.enviar({
+        tipo: 'confirmacao',
+        idTransferencia: transferencia.idTransferencia,
+        indiceDoArquivo: 0,
+        bytesConfirmados: transferencia.bytesConfirmados,
+      });
+      transferencia.ultimoValorConfirmado = transferencia.bytesConfirmados;
+      transferencia.ultimaConfirmacaoEm = performance.now();
+      transferencia.confirmacoesEnviadas++;
+    }
+  }
+
+  function encerrar(transferencia) {
+    clearInterval(transferencia.temporizadorDeConfirmacao);
+    if (atual === transferencia) {
+      atual = null;
+    }
+  }
+
+  async function falhar(transferencia, motivo) {
+    if (atual !== transferencia) {
+      return; // já encerrada
+    }
+    encerrar(transferencia);
     await transferencia.destino.descartar();
     controle.enviar({ tipo: 'erro-transferencia', idTransferencia: transferencia.idTransferencia, motivo });
     aoFalhar(new Error(motivo));
   }
 
-  async function concluir() {
-    const transferencia = atual;
-    atual = null;
+  async function concluir(transferencia) {
+    encerrar(transferencia);
+    confirmarSeNecessario(transferencia, true);
     const blob = await transferencia.destino.finalizar();
     const duracaoMs = performance.now() - transferencia.inicio;
     controle.enviar({
       tipo: 'arquivo-recebido',
       idTransferencia: transferencia.idTransferencia,
-      bytesRecebidos: transferencia.bytesRecebidos,
+      bytesRecebidos: transferencia.bytesConfirmados,
       duracaoMs,
     });
     aoConcluir({
       blob,
       nomeOriginal: transferencia.arquivo.nome,
       nomeSeguro: sanitizarNomeDeArquivo(transferencia.arquivo.nome),
-      bytesRecebidos: transferencia.bytesRecebidos,
+      bytesRecebidos: transferencia.bytesConfirmados,
       blocos: transferencia.sequenciaEsperada,
+      confirmacoesEnviadas: transferencia.confirmacoesEnviadas,
       duracaoMs,
-      vazaoMiBs: transferencia.bytesRecebidos / (1024 * 1024) / (duracaoMs / 1000),
+      vazaoMiBs: transferencia.bytesConfirmados / (1024 * 1024) / (duracaoMs / 1000),
       destino: transferencia.destino.nome,
     });
   }
@@ -92,18 +146,31 @@ export function criarRecebedor({
       aoRegistrar('Oferta recusada: já existe uma transferência em andamento');
       return;
     }
-    atual = {
+    const transferencia = {
       idTransferencia: mensagem.idTransferencia,
       arquivo,
       destino: criarDestino(),
+      confirmacao: lerIntervalosDeConfirmacao(mensagem),
       sequenciaEsperada: 0,
       bytesRecebidos: 0,
+      bytesConfirmados: 0,
+      ultimoValorConfirmado: 0,
+      ultimaConfirmacaoEm: performance.now(),
+      confirmacoesEnviadas: 0,
       inicio: performance.now(),
+      temporizadorDeConfirmacao: null,
     };
-    aoRegistrar(`Oferta recebida: ${arquivo.tamanho} bytes; aceita automaticamente (protótipo)`);
+    // Confirmação por tempo: garante o envio mesmo quando param de chegar blocos
+    // (ex.: remetente esperando a janela abrir).
+    transferencia.temporizadorDeConfirmacao = setInterval(
+      () => confirmarSeNecessario(transferencia),
+      transferencia.confirmacao.intervaloMs,
+    );
+    atual = transferencia;
+    aoRegistrar(`Oferta recebida: ${arquivo.tamanho} bytes; aceita automaticamente (protótipo); confirmações a cada ${transferencia.confirmacao.intervaloBytes} bytes ou ${transferencia.confirmacao.intervaloMs} ms`);
     controle.enviar({ tipo: 'aceitar-transferencia', idTransferencia: mensagem.idTransferencia, indicesAceitos: [0] });
     if (arquivo.tamanho === 0) {
-      await concluir();
+      await concluir(transferencia);
     }
   });
 
@@ -116,29 +183,43 @@ export function criarRecebedor({
       aoRegistrar(erro.message);
       return;
     }
-    if (!atual || bloco.idTransferencia !== atual.idTransferencia) {
+    const transferencia = atual;
+    if (!transferencia || bloco.idTransferencia !== transferencia.idTransferencia) {
       blocosDescartados++; // ex.: blocos que chegam depois de um cancelamento (P7)
       return;
     }
-    if (bloco.sequencia !== atual.sequenciaEsperada) {
-      await falhar(`bloco fora de ordem: esperado ${atual.sequenciaEsperada}, recebido ${bloco.sequencia}`);
+    if (bloco.sequencia !== transferencia.sequenciaEsperada) {
+      await falhar(transferencia, `bloco fora de ordem: esperado ${transferencia.sequenciaEsperada}, recebido ${bloco.sequencia}`);
       return;
     }
-    const restante = atual.arquivo.tamanho - atual.bytesRecebidos;
-    if (bloco.conteudo.byteLength > restante) {
-      await falhar('mais bytes recebidos do que o tamanho anunciado');
+    const tamanho = bloco.conteudo.byteLength;
+    if (tamanho > transferencia.arquivo.tamanho - transferencia.bytesRecebidos) {
+      await falhar(transferencia, 'mais bytes recebidos do que o tamanho anunciado');
       return;
     }
 
-    atual.sequenciaEsperada++;
-    atual.bytesRecebidos += bloco.conteudo.byteLength;
-    // A gravação no destino é registrada antes de qualquer await, para preservar a ordem dos blocos.
-    const gravacao = atual.destino.adicionar(bloco.conteudo);
-    const completo = atual.bytesRecebidos === atual.arquivo.tamanho;
-    informarProgresso(completo);
-    await gravacao;
-    if (completo && atual) {
-      await concluir();
+    // Atualizações síncronas antes do primeiro await: preservam a ordem dos blocos,
+    // pois o navegador dispara o próximo evento "message" sem esperar este terminar.
+    transferencia.sequenciaEsperada++;
+    transferencia.bytesRecebidos += tamanho;
+    const gravacao = transferencia.destino.adicionar(bloco.conteudo); // o destino grava em ordem
+
+    try {
+      await gravacao;
+    } catch (erro) {
+      await falhar(transferencia, `falha ao gravar: ${erro.message}`);
+      return;
+    }
+    if (atual !== transferencia) {
+      return; // transferência encerrada enquanto gravava
+    }
+    transferencia.bytesConfirmados += tamanho;
+    const completo = transferencia.bytesConfirmados === transferencia.arquivo.tamanho;
+    informarProgresso(transferencia, completo);
+    if (completo) {
+      await concluir(transferencia);
+    } else {
+      confirmarSeNecessario(transferencia);
     }
   });
 

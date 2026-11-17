@@ -56,10 +56,16 @@ const HASH_DO_DOWNLOAD = `(async () => {
 })()`;
 
 /** Envia um arquivo do disco de A para B pela interface e devolve o que B recebeu e as métricas de A. */
-async function transferirPeloPrototipo(paginaA, paginaB, caminhoDoArquivo, limiteMs) {
+async function transferirPeloPrototipo(paginaA, paginaB, caminhoDoArquivo, limiteMs, { medirLatencia = false } = {}) {
   await paginaB.avaliar('window.ultimoArquivoRecebido = null; true');
+  await paginaA.avaliar(`window.ultimoEnvio = null; ${porId('latencia-amostras')}.textContent = '—'; true`);
   await paginaA.definirArquivos('#arquivo-para-enviar', [caminhoDoArquivo]);
   await paginaA.avaliar(`${porId('botao-enviar-arquivo')}.click(); true`);
+  if (medirLatencia) {
+    // Latência do "controle" enquanto o "dados" está carregado (20 sondas, 100 ms).
+    await paginaA.aguardarValor(`${porId('envio-estado')}.textContent === 'enviando' || null`, 10_000);
+    await paginaA.avaliar(`${porId('botao-medir-latencia')}.click(); true`);
+  }
   const estadoDoEnvio = await paginaA.aguardarValor(
     `(() => { const t = ${porId('envio-estado')}.textContent; return t.startsWith('concluído') || t.startsWith('falhou') ? t : null; })()`,
     limiteMs,
@@ -75,8 +81,30 @@ async function transferirPeloPrototipo(paginaA, paginaB, caminhoDoArquivo, limit
     remetente: await paginaA.aguardarValor('window.ultimaMemoria?.envio ?? null', 60_000),
     destinatario: await paginaB.aguardarValor('window.ultimaMemoria?.recebimento ?? null', 60_000),
   };
-  return { estadoDoEnvio, recebido, metricas, memoria };
+  const envio = await paginaA.avaliar('window.ultimoEnvio');
+  const latencia = medirLatencia
+    ? await paginaA.aguardarValor(`${porId('latencia-amostras')}.textContent !== '—' ? ({
+        amostras: ${porId('latencia-amostras')}.textContent,
+        mediana: ${porId('latencia-mediana')}.textContent,
+        p95: ${porId('latencia-p95')}.textContent,
+        maximo: ${porId('latencia-maximo')}.textContent,
+      }) : null`, 30_000)
+    : null;
+  return { estadoDoEnvio, recebido, metricas, memoria, envio, latencia };
 }
+
+const JANELA_PADRAO = 8 * 1024 * 1024;
+
+/** Resumo das métricas do envio, para os diagnósticos dos testes. */
+const resumirEnvio = (envio) => ({
+  duracaoS: Math.round(envio.duracaoMs) / 1000,
+  vazaoMiBs: Math.round(envio.vazaoMiBs * 10) / 10,
+  maiorJanelaMiB: emMiB(envio.maiorJanelaObservada),
+  maiorBufferMiB: emMiB(envio.maiorBufferObservado),
+  pausasBuffer: envio.pausasPorBufferCheio,
+  pausasJanela: envio.pausasPorJanelaCheia,
+  confirmacoes: envio.confirmacoesRecebidas,
+});
 
 const emMiB = (bytes) => Math.round((bytes / (1024 * 1024)) * 10) / 10;
 const descreverMemoriaEmMiB = (resumo) => ({
@@ -161,12 +189,20 @@ describe('autoteste no navegador', { skip: motivoParaIgnorar, timeout: 300_000 }
       await conectarPeloPrototipo(paginaA, paginaB, origem);
     });
 
-    for (const [nome, limiteMs] of [['teste-10mib.bin', 60_000], ['teste-100mib.bin', 180_000]]) {
+    for (const [nome, limiteMs, medirLatencia] of [['teste-10mib.bin', 60_000, false], ['teste-100mib.bin', 180_000, true]]) {
       const caminho = join(PASTA_ARQUIVOS_DE_TESTE, nome);
       test(`deveTransferir ${nome} com conteudo identico ao original`, { skip: !existsSync(caminho) && `${nome} não encontrado` }, async (contexto) => {
-        const { estadoDoEnvio, recebido, metricas, memoria } = await transferirPeloPrototipo(paginaA, paginaB, caminho, limiteMs);
-        contexto.diagnostic(`${nome}: ${JSON.stringify(metricas)}`);
+        const { estadoDoEnvio, recebido, memoria, envio, latencia } = await transferirPeloPrototipo(paginaA, paginaB, caminho, limiteMs, { medirLatencia });
+        contexto.diagnostic(`${nome}: ${JSON.stringify(resumirEnvio(envio))}`);
         contexto.diagnostic(`${nome} memória (MiB): remetente ${JSON.stringify(descreverMemoriaEmMiB(memoria.remetente))}, destinatário ${JSON.stringify(descreverMemoriaEmMiB(memoria.destinatario))}`);
+        if (latencia) {
+          contexto.diagnostic(`${nome} latência do controle durante a transferência: ${JSON.stringify(latencia)}`);
+        }
+
+        // P5: confirmações e janela.
+        assert.equal(envio.bytesConfirmados, statSync(caminho).size, 'todos os bytes deveriam estar confirmados');
+        assert.ok(envio.confirmacoesRecebidas > 0, 'deveria haver confirmações do destinatário');
+        assert.ok(envio.maiorJanelaObservada <= JANELA_PADRAO, `janela excedida: ${emMiB(envio.maiorJanelaObservada)} MiB`);
 
         assert.match(estadoDoEnvio, /^concluído/, estadoDoEnvio);
         assert.equal(recebido.nome, nome);
@@ -179,5 +215,26 @@ describe('autoteste no navegador', { skip: motivoParaIgnorar, timeout: 300_000 }
         assert.ok(crescimentoDoRemetente < 32 * 1024 * 1024, `remetente cresceu ${emMiB(crescimentoDoRemetente)} MiB`);
       });
     }
+
+    const caminho50 = join(PASTA_ARQUIVOS_DE_TESTE, 'teste-50mib.bin');
+    test('deveRespeitarAJanelaComDestinatarioLento', { skip: !existsSync(caminho50) && 'teste-50mib.bin não encontrado' }, async (contexto) => {
+      // Destinatário grava a no máximo cerca de 10 MiB/s (100 ms por MiB).
+      await paginaB.avaliar(`${porId('atraso-de-gravacao')}.value = '100'; true`);
+      try {
+        const { estadoDoEnvio, recebido, memoria, envio } = await transferirPeloPrototipo(paginaA, paginaB, caminho50, 120_000);
+        contexto.diagnostic(`50 MiB com destinatário lento: ${JSON.stringify(resumirEnvio(envio))}`);
+        contexto.diagnostic(`memória (MiB): remetente ${JSON.stringify(descreverMemoriaEmMiB(memoria.remetente))}, destinatário ${JSON.stringify(descreverMemoriaEmMiB(memoria.destinatario))}`);
+
+        assert.match(estadoDoEnvio, /^concluído/, estadoDoEnvio);
+        assert.equal(recebido.sha256, hashes['teste-50mib.bin']);
+        assert.ok(envio.pausasPorJanelaCheia > 0, 'com o destinatário lento, a janela deveria ter limitado o envio');
+        assert.ok(envio.maiorJanelaObservada <= JANELA_PADRAO, `janela excedida: ${emMiB(envio.maiorJanelaObservada)} MiB`);
+        // Sem a janela, os blocos se acumulariam na memória do destinatário à espera da gravação.
+        const crescimentoDoDestinatario = memoria.destinatario.maximaBytes - memoria.destinatario.inicialBytes;
+        assert.ok(crescimentoDoDestinatario < 32 * 1024 * 1024, `destinatário cresceu ${emMiB(crescimentoDoDestinatario)} MiB`);
+      } finally {
+        await paginaB.avaliar(`${porId('atraso-de-gravacao')}.value = '0'; true`);
+      }
+    });
   });
 });

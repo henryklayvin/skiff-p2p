@@ -51,3 +51,40 @@ export function criarDestinoEmBlob() {
     },
   };
 }
+
+/**
+ * Simula um destino lento (somente para testes do P5): espera `atrasoMsPorMiB`
+ * a cada MiB gravado. As gravações são encadeadas, então terminam na ordem de chegada.
+ */
+export function criarDestinoComAtraso(destinoBase, atrasoMsPorMiB) {
+  const MiB = 1024 * 1024;
+  let fila = Promise.resolve();
+  let acumulado = 0;
+  const esperar = (ms) => new Promise((pronto) => setTimeout(pronto, ms));
+
+  return {
+    nome: `${destinoBase.nome} com atraso de ${atrasoMsPorMiB} ms/MiB`,
+
+    adicionar(conteudo) {
+      fila = fila.then(async () => {
+        acumulado += conteudo.byteLength;
+        while (acumulado >= MiB) {
+          acumulado -= MiB;
+          await esperar(atrasoMsPorMiB);
+        }
+        await destinoBase.adicionar(conteudo);
+      });
+      return fila;
+    },
+
+    async finalizar() {
+      await fila;
+      return destinoBase.finalizar();
+    },
+
+    async descartar() {
+      await fila.catch(() => {});
+      return destinoBase.descartar();
+    },
+  };
+}

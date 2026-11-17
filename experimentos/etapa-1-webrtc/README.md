@@ -13,7 +13,8 @@
 | P2 | Conexão WebRTC por troca manual de SDP | Concluído: duas abas e PC ↔ iPhone conectados; PC ↔ emulador falhou (ver `resultados.md`) |
 | P3 | Latência do canal `controle` com o canal ocioso | Concluído: mediana de cerca de 5 ms entre PC e iPhone (ver `resultados.md`) |
 | P4 | Envio em blocos de 16 KiB com controle de fluxo local; destino em Blob | Concluído: 100 MiB íntegros com remetente estável (máximo de 2,7 MiB); 50 MiB PC → iPhone a 28 MiB/s |
-| P5 a P11 | Confirmações, hash, cancelamento, destinos, coturn, testes e relatório | Pendentes |
+| P5 | Confirmações (ACK) e janela ponta a ponta de 8 MiB | Implementado e testado automaticamente; validação manual pendente |
+| P6 a P11 | Hash, cancelamento, destinos, coturn, testes e relatório | Pendentes |
 
 ## Arquivos deste diretório
 
@@ -40,7 +41,7 @@
 | `publico/js/protocolo-de-dados.js` | Formato binário dos blocos (cabeçalho de 16 bytes, versão 1) |
 | `publico/js/envio.js` | Oferta, aceite, leitura em partes, envio em blocos e controle de fluxo por `bufferedAmount` |
 | `publico/js/recebimento.js` | Validação da oferta e dos blocos (ordem, tamanho), aceite automático, gravação no destino |
-| `publico/js/destinos.js` | Destino dos arquivos recebidos (P4: Blob) |
+| `publico/js/destinos.js` | Destino dos arquivos recebidos (Blob) e destino com atraso artificial, para simular gravação lenta |
 | `publico/js/nomes.js` | Sanitização de nomes de arquivos recebidos |
 | `publico/js/memoria.js` | Memória da própria aba (`measureUserAgentSpecificMemory`), amostrada durante a transferência |
 | `transferencia.test.mjs` | Testes unitários do formato dos blocos, dos nomes e da formatação |
