@@ -9,7 +9,8 @@
 | Passo | Descrição | Situação |
 |---|---|---|
 | P0 | Preparação: arquivos de teste, CA local, certificados, registros | Concluído |
-| P1 a P11 | Servidor HTTPS, protótipo, coturn, testes e relatório | Pendentes |
+| P1 | Servidor HTTPS estático e página de diagnóstico | Implementado; validação nos celulares pendente |
+| P2 a P11 | Protótipo, coturn, testes e relatório | Pendentes |
 
 ## Arquivos deste diretório
 
@@ -18,6 +19,46 @@
 | `README.md` | Este documento |
 | `arquivos-de-teste.md` | Tamanhos e SHA-256 dos arquivos de teste |
 | `registro-de-dispositivos.md` | Dispositivos usados nos testes (preencher antes da Fase D) |
+| `servidor.mjs` | Servidor HTTPS estático (módulo nativo `node:https`, sem dependências) |
+| `servidor.test.mjs` | Testes do servidor (`node:test`) |
+| `publico/` | **Único diretório servido**: página de diagnóstico e, nos próximos passos, o protótipo |
+
+## Executar o servidor
+
+```bash
+node experimentos/etapa-1-webrtc/servidor.mjs
+```
+
+| Variável de ambiente | Padrão | Função |
+|---|---|---|
+| `SKIFF_ENDERECO` | `0.0.0.0` | Endereço de escuta (todas as interfaces) |
+| `SKIFF_PORTA` | `8443` | Porta |
+| `SKIFF_CERTIFICADOS` | `~/skiff-experimento/certificados` | Pasta com `servidor.crt` e `servidor.key` |
+
+**O que o servidor faz:**
+- serve somente `publico/` e recusa caminhos que tentam sair dele (`../`, inclusive codificados);
+- aceita apenas `GET` e `HEAD`;
+- envia cabeçalhos de segurança: CSP restritiva, `nosniff`, `no-referrer` e `no-store`;
+- envia COOP e COEP, que habilitam `crossOriginIsolated` para a medição de memória do passo P8;
+- registra só método, caminho e status, sem IP do cliente.
+
+Na primeira execução, o **Firewall do Windows** pode pedir permissão para o Node.js. Permita **somente em redes privadas**: os celulares precisam acessar a porta 8443.
+
+## Testes automáticos
+
+```bash
+node --test "experimentos/etapa-1-webrtc/**/*.test.mjs"
+```
+
+Os testes de integração usam os certificados do P0 e são ignorados se eles não existirem.
+
+**Verificação manual da cadeia** com o `curl` do Git para Windows:
+- é preciso usar `--ssl-no-revoke`, porque o Schannel tenta consultar a revogação do certificado e uma CA local não oferece esse serviço;
+- a validação da cadeia continua ativa.
+
+```bash
+curl --ssl-no-revoke --cacert ~/skiff-experimento/certificados/ca-skiff-experimento.crt https://192.168.1.2:8443/
+```
 
 ## O que fica fora do repositório
 
@@ -96,9 +137,11 @@ openssl x509 -in servidor.crt -noout -ext subjectAltName,extendedKeyUsage
 openssl x509 -in ca-skiff-experimento.crt -noout -ext nameConstraints
 ```
 
-## Instalação da CA nos celulares (antes da Fase D)
+## Instalação da CA no computador e nos celulares
 
 Transfira **apenas** `ca-skiff-experimento.cer`, nunca os arquivos `.key`.
+
+- **Windows (Chrome e Edge):** abra `ca-skiff-experimento.cer` > *Instalar Certificado* > *Usuário Atual* > *Colocar todos os certificados no repositório a seguir* > *Autoridades de Certificação Raiz Confiáveis*. Para remover depois, use `certmgr.msc`.
 
 - **iPhone:**
   1. Abra o arquivo e instale o perfil em *Ajustes > Geral > VPN e Gerenciamento de Dispositivo*.

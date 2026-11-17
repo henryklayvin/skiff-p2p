@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skiff P2P — Experimento da Etapa 1</title>
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Skiff P2P — Experimento da Etapa 1</h1>
+      <p class="aviso">Protótipo descartável. Não faz parte do produto.</p>
+    </header>
+
+    <section aria-labelledby="titulo-diagnostico">
+      <h2 id="titulo-diagnostico">Diagnóstico do navegador</h2>
+      <p>Confere se este navegador oferece o que o experimento precisa. Use estes dados no registro de dispositivos.</p>
+      <table>
+        <thead>
+          <tr><th scope="col">Item</th><th scope="col">Resultado</th></tr>
+        </thead>
+        <tbody id="tabela-diagnostico"></tbody>
+      </table>
+      <h3>Identificação do navegador</h3>
+      <pre id="agente-do-usuario"></pre>
+    </section>
+  </main>
+  <script type="module" src="js/diagnostico.js"></script>
+</body>
+</html>
