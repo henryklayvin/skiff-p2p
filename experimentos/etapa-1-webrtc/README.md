@@ -64,7 +64,7 @@ Os testes no navegador abrem o Chrome instalado (ou o indicado em `SKIFF_CHROME`
 
 ## Como usar o protótipo de conexão (P2)
 
-1. Com o servidor rodando, abra `https://192.168.1.2:8443/prototipo.html` nos dois aparelhos, ou em duas abas.
+1. Com o servidor rodando, abra `https://192.168.1.4:8443/prototipo.html` nos dois aparelhos, ou em duas abas.
 2. Num deles, escolha **"Sou A"** e clique em **Gerar oferta**. Copie a oferta.
 3. No outro, escolha **"Sou B"**, cole a oferta e clique em **Gerar resposta**. Copie a resposta.
 4. Em A, cole a resposta e clique em **Aplicar resposta**.
@@ -77,7 +77,7 @@ Os textos de SDP contêm endereços IP. Troque-os só por canal privado e não o
 - a validação da cadeia continua ativa.
 
 ```bash
-curl --ssl-no-revoke --cacert ~/skiff-experimento/certificados/ca-skiff-experimento.crt https://192.168.1.2:8443/
+curl --ssl-no-revoke --cacert ~/skiff-experimento/certificados/ca-skiff-experimento.crt https://192.168.1.4:8443/
 ```
 
 ## O que fica fora do repositório
@@ -117,7 +117,7 @@ Ajuste `IP_REDE` e `SUBREDE` se o IP do computador mudar. Por exemplo, se o DHCP
 
 ```bash
 export MSYS_NO_PATHCONV=1   # impede o Git Bash de converter "/CN=..." em caminho do Windows
-IP_REDE="192.168.1.2"
+IP_REDE="192.168.1.4"
 SUBREDE="192.168.1.0/255.255.255.0"
 DIR="$HOME/skiff-experimento/certificados"
 mkdir -p "$DIR" && cd "$DIR"

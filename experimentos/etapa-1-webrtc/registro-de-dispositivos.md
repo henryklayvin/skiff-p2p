@@ -15,7 +15,7 @@ Preencha **antes da Fase D** (testes móveis). Atualize a tabela se algum sistem
 
 | Identificador | Tipo | Fabricante e modelo | Sistema e versão | Navegador e versão | Rede usada | Observações |
 |---|---|---|---|---|---|---|
-| PC-1 | Computador | *a informar* | Windows 11 Pro | Chrome 157 (versão completa *a informar*) | Ethernet, 192.168.1.2 | Servidor HTTPS do protótipo |
+| PC-1 | Computador | *a informar* | Windows 11 Pro | Chrome 157 (versão completa *a informar*) | Ethernet, IP dinâmico (192.168.1.2 no P1; 192.168.1.4 a partir do P2) | Servidor HTTPS do protótipo |
 | AND-1 | **Emulador Android** (Android Studio), executado no PC-1 | Imagem do emulador: *a informar* | *a informar* (versão do Android e nível de API) | Chrome 157 (versão completa *a informar*) | Rede virtual do emulador, via PC-1 | Compartilha CPU, memória e rede com o PC-1 |
 | IOS-1 | iPhone | *a informar* | *a informar* (provavelmente iOS 26.6.1, conforme `Version/26.6.1`) | Safari | Wi-Fi da mesma rede | |
 
