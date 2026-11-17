@@ -1,0 +1,3 @@
+# Código de terceiros: preservar os bytes exatamente como publicados
+# (sem conversão de quebras de linha), para o SHA-256 registrado continuar válido.
+* -text
