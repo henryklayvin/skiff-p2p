@@ -9,8 +9,9 @@
 | Passo | Descrição | Situação |
 |---|---|---|
 | P0 | Preparação: arquivos de teste, CA local, certificados, registros | Concluído |
-| P1 | Servidor HTTPS estático e página de diagnóstico | Implementado; validação nos celulares pendente |
-| P2 a P11 | Protótipo, coturn, testes e relatório | Pendentes |
+| P1 | Servidor HTTPS estático e página de diagnóstico | Concluído: PC, iPhone e emulador Android abrem sem alerta |
+| P2 | Conexão WebRTC por troca manual de SDP | Em andamento |
+| P3 a P11 | Transferência, coturn, testes e relatório | Pendentes |
 
 ## Arquivos deste diretório
 

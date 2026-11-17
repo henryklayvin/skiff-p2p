@@ -16,14 +16,19 @@ Preencha **antes da Fase D** (testes móveis). Atualize a tabela se algum sistem
 | Identificador | Tipo | Fabricante e modelo | Sistema e versão | Navegador e versão | Rede usada | Observações |
 |---|---|---|---|---|---|---|
 | PC-1 | Computador | *a informar* | Windows 11 Pro | Chrome 157 (versão completa *a informar*) | Ethernet, 192.168.1.2 | Servidor HTTPS do protótipo |
-| AND-1 | Android | *a informar* | *a informar* | Chrome 157 (versão completa *a informar*) | Wi-Fi da mesma rede | |
+| AND-1 | **Emulador Android** (Android Studio), executado no PC-1 | Imagem do emulador: *a informar* | *a informar* (versão do Android e nível de API) | Chrome 157 (versão completa *a informar*) | Rede virtual do emulador, via PC-1 | Compartilha CPU, memória e rede com o PC-1 |
 | IOS-1 | iPhone | *a informar* | *a informar* (provavelmente iOS 26.6.1, conforme `Version/26.6.1`) | Safari | Wi-Fi da mesma rede | |
 
 Use os identificadores (`PC-1`, `AND-1`, `IOS-1`) nos registros de medição e no relatório.
 
+**Android sem aparelho físico (decisão de 2026-11-17).**
+- O AND-1 é um emulador. Ele vale para os testes de conexão e funcionamento.
+- Memória, Wake Lock e segundo plano no Android **não** são validados em aparelho físico nesta etapa.
+- A rede do emulador sai pelo PC-1, então os testes entre PC-1 e AND-1 não passam pelo Wi-Fi.
+
 ## Diagnóstico do navegador (P1, 2026-11-17)
 
-Resultado da página de diagnóstico (`https://192.168.1.2:8443/`), informado pelo desenvolvedor.
+Resultado da página de diagnóstico (`https://192.168.1.2:8443/`), informado pelo desenvolvedor. Em todos os aparelhos, a página abriu **sem alerta de certificado** depois da configuração correta da CA local (confirmado pelo desenvolvedor).
 
 | Item | PC-1 (Chrome) | AND-1 (Chrome) | IOS-1 (Safari) |
 |---|---|---|---|

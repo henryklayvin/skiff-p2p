@@ -63,6 +63,7 @@ Ao final de cada etapa:
 | TURN | coturn local com credenciais temporárias e **retransmissão forçada**. Sem VPS nem domínio; TURN entre redes diferentes fica para depois |
 | Hash | **SHA-256 incremental**. `crypto.subtle.digest()` sobre o arquivo inteiro **não** é a estratégia principal, porque exige os dados completos na memória. `hash-wasm` será **avaliada** no protótipo, sem aprovação para o projeto definitivo |
 | Referência móvel | **50 MB nos dois sentidos**: computador ↔ Android e computador ↔ iPhone |
+| Android | **Emulador do Android Studio**, sem exigir aparelho físico (decisão de 2026-11-17). Valida conexão e funcionamento. **Memória, Wake Lock e segundo plano no Android não são validados em aparelho físico** nesta etapa, e o relatório registra essa limitação. Se um Android físico ficar disponível, esses testes são repetidos |
 | Dispositivos | Modelos, versões do sistema e dos navegadores registrados **antes** da fase de testes móveis |
 
 ### Cuidados de segurança do experimento
